@@ -87,12 +87,12 @@ export function FlightBlock({
           {flight.status === "delayed" && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />}
         </div>
 
-        {/* Delay badge on right edge - strong red */}
+        {/* Delay badge on right edge - full height strong red */}
         {flight.delayMinutes && (
-          <div className="absolute -right-px top-0 bottom-0 flex items-center">
-            <div className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 min-w-[28px] text-center shadow-lg border-l-2 border-red-800">
+          <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-600 min-w-[32px] px-1 rounded-r border-l-2 border-red-800 shadow-lg">
+            <span className="text-white text-[11px] font-bold">
               {flight.delayMinutes}
-            </div>
+            </span>
           </div>
         )}
       </div>
