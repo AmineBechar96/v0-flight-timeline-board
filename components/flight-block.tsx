@@ -9,9 +9,10 @@ import { cn } from "@/lib/utils"
 interface FlightBlockProps {
   flight: Flight
   hourWidth: number
+  onSelect?: (flight: Flight) => void
 }
 
-export function FlightBlock({ flight, hourWidth }: FlightBlockProps) {
+export function FlightBlock({ flight, hourWidth, onSelect }: FlightBlockProps) {
   const [showTooltip, setShowTooltip] = useState(false)
 
   const left = flight.startTime * hourWidth
@@ -38,6 +39,7 @@ export function FlightBlock({ flight, hourWidth }: FlightBlockProps) {
       style={{ left: `${left}px`, width: `${width}px` }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => onSelect?.(flight)}
     >
       <div
         className={cn(

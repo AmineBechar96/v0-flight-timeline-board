@@ -11,6 +11,7 @@ interface TimelineGridProps {
   flights: Flight[]
   maintenanceZones: MaintenanceZone[]
   zoom: number
+  onFlightSelect?: (flight: Flight) => void
 }
 
 export interface TimelineGridHandle {
@@ -22,7 +23,7 @@ const ROW_HEIGHT = 36 // pixels per stand row
 const HOURS = Array.from({ length: 25 }, (_, i) => i) // 0-24 hours
 
 export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
-  function TimelineGrid({ flights, maintenanceZones, zoom }, ref) {
+  function TimelineGrid({ flights, maintenanceZones, zoom, onFlightSelect }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const [currentTimePosition, setCurrentTimePosition] = useState(0)
 
@@ -164,7 +165,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                 >
                   {/* Flight blocks */}
                   {flightsByStand[stand]?.map((flight) => (
-                    <FlightBlock key={flight.id} flight={flight} hourWidth={hourWidth} />
+                    <FlightBlock key={flight.id} flight={flight} hourWidth={hourWidth} onSelect={onFlightSelect} />
                   ))}
                   {/* Maintenance blocks */}
                   {maintenanceByStand[stand]?.map((zone) => (

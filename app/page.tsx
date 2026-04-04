@@ -7,7 +7,8 @@ import { TimelineGrid, type TimelineGridHandle } from "@/components/timeline-gri
 import { FilterControls, type FilterState } from "@/components/filter-controls"
 import { ZoomControls } from "@/components/zoom-controls"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
-import { generateFlights, generateMaintenanceZones } from "@/lib/mock-flights"
+import { FlightDetailPanel } from "@/components/flight-detail-panel"
+import { generateFlights, generateMaintenanceZones, type Flight } from "@/lib/mock-flights"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3]
 
@@ -15,6 +16,7 @@ export default function StandAllocationBoard() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [showHelp, setShowHelp] = useState(false)
+  const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     airlines: [],
@@ -117,6 +119,14 @@ export default function StandAllocationBoard() {
     })
   }, [])
 
+  const handleFlightSelect = useCallback((flight: Flight) => {
+    setSelectedFlight(flight)
+  }, [])
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedFlight(null)
+  }, [])
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <TimelineHeader
@@ -142,7 +152,7 @@ export default function StandAllocationBoard() {
       </div>
 
       <TimelineLegend />
-      <TimelineGrid ref={gridRef} flights={flights} maintenanceZones={maintenanceZones} zoom={zoom} />
+      <TimelineGrid ref={gridRef} flights={flights} maintenanceZones={maintenanceZones} zoom={zoom} onFlightSelect={handleFlightSelect} />
 
       <KeyboardShortcuts
         isOpen={showHelp}
@@ -156,6 +166,8 @@ export default function StandAllocationBoard() {
         onScrollToNow={handleScrollToNow}
         onClearFilters={handleClearFilters}
       />
+
+      <FlightDetailPanel flight={selectedFlight} onClose={handleClosePanel} />
     </div>
   )
 }
