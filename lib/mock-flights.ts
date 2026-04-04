@@ -51,11 +51,17 @@ const flightTypes: FlightType[] = ["arrival", "departure", "turnaround"]
 const airports = ["JFK", "LAX", "ORD", "DFW", "DEN", "SFO", "SEA", "LAS", "MIA", "BOS", "ATL", "PHX", "CDG", "FRA", "AMS", "MAD", "FCO", "LHR", "DXB", "SIN", "HND", "ICN", "HKG", "SYD"]
 
 // Generate 37 stands
-export const stands = Array.from({ length: 37 }, (_, i) => {
-  const terminal = i < 12 ? "T1" : i < 24 ? "T2" : "T3"
-  const standNumber = (i % 12) + 1
-  return `${terminal}-${String(standNumber).padStart(2, "0")}`
-})
+export const stands: string[] = []
+const standConfig = [
+  { terminal: "T1", count: 12 },
+  { terminal: "T2", count: 12 },
+  { terminal: "T3", count: 13 },
+]
+for (const config of standConfig) {
+  for (let i = 1; i <= config.count; i++) {
+    stands.push(`${config.terminal}-${String(i).padStart(2, "0")}`)
+  }
+}
 
 function generateFlightNumber(airlineCode: string): string {
   return `${airlineCode}${Math.floor(Math.random() * 9000) + 100}`

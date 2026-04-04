@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Plane, Clock, CalendarDays, Filter, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -11,17 +12,32 @@ interface TimelineHeaderProps {
 }
 
 export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh }: TimelineHeaderProps) {
-  const currentTime = new Date()
-  const formattedDate = currentTime.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  const formattedTime = currentTime.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  const [formattedDate, setFormattedDate] = useState("")
+  const [formattedTime, setFormattedTime] = useState("")
+
+  useEffect(() => {
+    const updateTime = () => {
+      const currentTime = new Date()
+      setFormattedDate(
+        currentTime.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      )
+      setFormattedTime(
+        currentTime.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      )
+    }
+
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <header className="border-b border-border bg-card px-6 py-4">
@@ -40,11 +56,11 @@ export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, 
           <div className="ml-8 flex items-center gap-6 border-l border-border pl-8">
             <div className="flex items-center gap-2 text-sm">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground">{formattedDate}</span>
+              <span className="font-medium text-foreground">{formattedDate || "---"}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="font-mono text-foreground">{formattedTime}</span>
+              <span className="font-mono text-foreground">{formattedTime || "--:--"}</span>
             </div>
           </div>
         </div>
