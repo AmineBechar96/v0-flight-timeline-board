@@ -5,7 +5,7 @@ import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Wrench } from "lucide-react
 export function TimelineLegend() {
   return (
     <div className="flex items-center gap-6 border-b border-border bg-card/50 px-6 py-3">
-      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Legend</span>
+      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Stand</span>
       
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
