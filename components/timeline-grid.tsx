@@ -1,17 +1,20 @@
 "use client"
 
-import { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef } from "react"
+import { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from "react"
 import type { Flight, MaintenanceZone } from "@/lib/mock-flights"
 import { stands } from "@/lib/mock-flights"
 import { FlightBlock } from "./flight-block"
 import { MaintenanceBlock } from "./maintenance-block"
 import { cn } from "@/lib/utils"
+import { checkConflict, type ConflictResult } from "@/hooks/use-flight-drag"
+import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 
 interface TimelineGridProps {
   flights: Flight[]
   maintenanceZones: MaintenanceZone[]
   zoom: number
   onFlightSelect?: (flight: Flight) => void
+  onFlightReassign?: (flightId: string, newStand: string) => void
 }
 
 export interface TimelineGridHandle {
@@ -23,9 +26,13 @@ const ROW_HEIGHT = 36 // pixels per stand row
 const HOURS = Array.from({ length: 25 }, (_, i) => i) // 0-24 hours
 
 export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
-  function TimelineGrid({ flights, maintenanceZones, zoom, onFlightSelect }, ref) {
+  function TimelineGrid({ flights, maintenanceZones, zoom, onFlightSelect, onFlightReassign }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const [currentTimePosition, setCurrentTimePosition] = useState(0)
+    const [draggedFlight, setDraggedFlight] = useState<Flight | null>(null)
+    const [targetStand, setTargetStand] = useState<string | null>(null)
+    const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null)
+    const [showDropFeedback, setShowDropFeedback] = useState<{ stand: string; success: boolean } | null>(null)
 
     const hourWidth = BASE_HOUR_WIDTH * zoom
 
@@ -84,8 +91,101 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
       return `${String(hour % 24).padStart(2, "0")}:00`
     }
 
+    // Drag handlers
+    const handleDragStart = useCallback((flight: Flight) => {
+      setDraggedFlight(flight)
+    }, [])
+
+    const handleDragEnd = useCallback(() => {
+      setDraggedFlight(null)
+      setTargetStand(null)
+      setConflictResult(null)
+    }, [])
+
+    const handleDragOver = useCallback(
+      (e: React.DragEvent, stand: string) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "move"
+
+        if (draggedFlight && stand !== targetStand) {
+          setTargetStand(stand)
+          const result = checkConflict(draggedFlight, stand, flights)
+          setConflictResult(result)
+        }
+      },
+      [draggedFlight, targetStand, flights]
+    )
+
+    const handleDragLeave = useCallback(() => {
+      setTargetStand(null)
+      setConflictResult(null)
+    }, [])
+
+    const handleDrop = useCallback(
+      (e: React.DragEvent, stand: string) => {
+        e.preventDefault()
+
+        try {
+          const flightData = JSON.parse(e.dataTransfer.getData("application/json")) as Flight
+          const result = checkConflict(flightData, stand, flights)
+
+          if (!result.hasConflict && stand !== flightData.stand) {
+            onFlightReassign?.(flightData.id, stand)
+            setShowDropFeedback({ stand, success: true })
+          } else if (result.hasConflict) {
+            setShowDropFeedback({ stand, success: false })
+          }
+        } catch {
+          // Invalid data
+        }
+
+        // Clear feedback after animation
+        setTimeout(() => {
+          setShowDropFeedback(null)
+        }, 1500)
+
+        setDraggedFlight(null)
+        setTargetStand(null)
+        setConflictResult(null)
+      },
+      [flights, onFlightReassign]
+    )
+
     return (
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Conflict indicator overlay */}
+        {draggedFlight && conflictResult && (
+          <div className="absolute top-2 right-2 z-50 rounded-lg border bg-popover p-3 shadow-xl">
+            {conflictResult.hasConflict ? (
+              <div className="flex items-center gap-2 text-red-400">
+                <XCircle className="h-5 w-5" />
+                <div>
+                  <p className="font-medium text-sm">Conflict Detected</p>
+                  <p className="text-xs text-muted-foreground">
+                    {conflictResult.conflictingFlights.length} flight(s) within 15min buffer
+                  </p>
+                </div>
+              </div>
+            ) : targetStand && targetStand !== draggedFlight.stand ? (
+              <div className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle className="h-5 w-5" />
+                <div>
+                  <p className="font-medium text-sm">Stand Available</p>
+                  <p className="text-xs text-muted-foreground">Drop to assign to {targetStand}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <AlertTriangle className="h-5 w-5" />
+                <div>
+                  <p className="font-medium text-sm">Dragging {draggedFlight.flightNumber}</p>
+                  <p className="text-xs">Hover over a stand row to check availability</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stand labels - fixed left column */}
         <div className="flex w-24 shrink-0 flex-col border-r border-border bg-card">
           <div className="flex h-10 items-center justify-center border-b border-border bg-muted/50 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -96,8 +196,10 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
               <div
                 key={stand}
                 className={cn(
-                  "flex h-9 items-center justify-center border-b border-border text-sm font-medium",
-                  index % 2 === 0 ? "bg-card" : "bg-muted/30"
+                  "flex h-9 items-center justify-center border-b border-border text-sm font-medium transition-colors",
+                  index % 2 === 0 ? "bg-card" : "bg-muted/30",
+                  targetStand === stand && !conflictResult?.hasConflict && "bg-emerald-500/20",
+                  targetStand === stand && conflictResult?.hasConflict && "bg-red-500/20"
                 )}
               >
                 <span className="text-foreground">{stand}</span>
@@ -154,25 +256,67 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
               )}
 
               {/* Stand rows */}
-              {stands.map((stand, index) => (
-                <div
-                  key={stand}
-                  className={cn(
-                    "relative border-b border-border",
-                    index % 2 === 0 ? "bg-card" : "bg-muted/20"
-                  )}
-                  style={{ height: `${ROW_HEIGHT}px` }}
-                >
-                  {/* Flight blocks */}
-                  {flightsByStand[stand]?.map((flight) => (
-                    <FlightBlock key={flight.id} flight={flight} hourWidth={hourWidth} onSelect={onFlightSelect} />
-                  ))}
-                  {/* Maintenance blocks */}
-                  {maintenanceByStand[stand]?.map((zone) => (
-                    <MaintenanceBlock key={zone.id} zone={zone} hourWidth={hourWidth} />
-                  ))}
-                </div>
-              ))}
+              {stands.map((stand, index) => {
+                const isTarget = targetStand === stand
+                const hasConflict = isTarget && conflictResult?.hasConflict
+                const isAvailable = isTarget && !conflictResult?.hasConflict && draggedFlight?.stand !== stand
+                const feedbackForStand = showDropFeedback?.stand === stand
+
+                return (
+                  <div
+                    key={stand}
+                    className={cn(
+                      "relative border-b border-border transition-colors",
+                      index % 2 === 0 ? "bg-card" : "bg-muted/20",
+                      isTarget && "ring-2 ring-inset",
+                      isAvailable && "bg-emerald-500/10 ring-emerald-500",
+                      hasConflict && "bg-red-500/10 ring-red-500",
+                      feedbackForStand && showDropFeedback.success && "animate-pulse bg-emerald-500/30",
+                      feedbackForStand && !showDropFeedback.success && "animate-pulse bg-red-500/30"
+                    )}
+                    style={{ height: `${ROW_HEIGHT}px` }}
+                    onDragOver={(e) => handleDragOver(e, stand)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, stand)}
+                  >
+                    {/* Drop zone indicator */}
+                    {isTarget && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                        {isAvailable && (
+                          <div className="flex items-center gap-1 rounded-full bg-emerald-500 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                            <CheckCircle className="h-3 w-3" />
+                            Drop here
+                          </div>
+                        )}
+                        {hasConflict && (
+                          <div className="flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                            <XCircle className="h-3 w-3" />
+                            Conflict
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Flight blocks */}
+                    {flightsByStand[stand]?.map((flight) => (
+                      <FlightBlock
+                        key={flight.id}
+                        flight={flight}
+                        hourWidth={hourWidth}
+                        onSelect={onFlightSelect}
+                        isDragging={draggedFlight?.id === flight.id}
+                        isConflicting={conflictResult?.conflictingFlights.some((f) => f.id === flight.id)}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                      />
+                    ))}
+                    {/* Maintenance blocks */}
+                    {maintenanceByStand[stand]?.map((zone) => (
+                      <MaintenanceBlock key={zone.id} zone={zone} hourWidth={hourWidth} />
+                    ))}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

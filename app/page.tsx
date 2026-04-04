@@ -26,8 +26,15 @@ export default function StandAllocationBoard() {
   const gridRef = useRef<TimelineGridHandle>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const allFlights = useMemo(() => generateFlights(), [refreshKey])
+  const [flightsData, setFlightsData] = useState<Flight[]>([])
   const maintenanceZones = useMemo(() => generateMaintenanceZones(), [refreshKey])
+
+  // Generate flights on refresh
+  useMemo(() => {
+    setFlightsData(generateFlights())
+  }, [refreshKey])
+
+  const allFlights = flightsData
 
   // Filter flights based on current filters
   const flights = useMemo(() => {
@@ -127,6 +134,14 @@ export default function StandAllocationBoard() {
     setSelectedFlight(null)
   }, [])
 
+  const handleFlightReassign = useCallback((flightId: string, newStand: string) => {
+    setFlightsData((prev) =>
+      prev.map((flight) =>
+        flight.id === flightId ? { ...flight, stand: newStand } : flight
+      )
+    )
+  }, [])
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <TimelineHeader
@@ -152,7 +167,7 @@ export default function StandAllocationBoard() {
       </div>
 
       <TimelineLegend />
-      <TimelineGrid ref={gridRef} flights={flights} maintenanceZones={maintenanceZones} zoom={zoom} onFlightSelect={handleFlightSelect} />
+      <TimelineGrid ref={gridRef} flights={flights} maintenanceZones={maintenanceZones} zoom={zoom} onFlightSelect={handleFlightSelect} onFlightReassign={handleFlightReassign} />
 
       <KeyboardShortcuts
         isOpen={showHelp}

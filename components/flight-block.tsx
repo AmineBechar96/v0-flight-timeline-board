@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Users, Clock, AlertTriangle } from "lucide-react"
+import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Users, Clock, AlertTriangle, GripVertical } from "lucide-react"
 import type { Flight } from "@/lib/mock-flights"
 import { airlineColors, typeColors, statusColors } from "@/lib/mock-flights"
 import { cn } from "@/lib/utils"
@@ -10,9 +10,21 @@ interface FlightBlockProps {
   flight: Flight
   hourWidth: number
   onSelect?: (flight: Flight) => void
+  isDragging?: boolean
+  isConflicting?: boolean
+  onDragStart?: (flight: Flight) => void
+  onDragEnd?: () => void
 }
 
-export function FlightBlock({ flight, hourWidth, onSelect }: FlightBlockProps) {
+export function FlightBlock({
+  flight,
+  hourWidth,
+  onSelect,
+  isDragging,
+  isConflicting,
+  onDragStart,
+  onDragEnd,
+}: FlightBlockProps) {
   const [showTooltip, setShowTooltip] = useState(false)
 
   const left = flight.startTime * hourWidth
@@ -33,13 +45,30 @@ export function FlightBlock({ flight, hourWidth, onSelect }: FlightBlockProps) {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
   }
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/json", JSON.stringify(flight))
+    e.dataTransfer.effectAllowed = "move"
+    onDragStart?.(flight)
+  }
+
+  const handleDragEnd = () => {
+    onDragEnd?.()
+  }
+
   return (
     <div
-      className="group absolute top-1 bottom-1 cursor-pointer"
+      className={cn(
+        "group absolute top-1 bottom-1 cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50 scale-95",
+        isConflicting && "ring-2 ring-red-500 ring-offset-1 ring-offset-background animate-pulse"
+      )}
       style={{ left: `${left}px`, width: `${width}px` }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       onClick={() => onSelect?.(flight)}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
       <div
         className={cn(
@@ -47,15 +76,17 @@ export function FlightBlock({ flight, hourWidth, onSelect }: FlightBlockProps) {
           airlineColor,
           typeColor,
           statusStyle,
-          "hover:scale-[1.02] hover:shadow-lg hover:z-10"
+          "hover:scale-[1.02] hover:shadow-lg hover:z-10",
+          isConflicting && "bg-red-600 border-red-400"
         )}
       >
+        <GripVertical className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
         <TypeIcon className="h-3 w-3 shrink-0" />
         <span className="truncate font-semibold">{flight.flightNumber}</span>
         {flight.status === "delayed" && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />}
       </div>
 
-      {showTooltip && (
+      {showTooltip && !isDragging && (
         <div className="absolute left-1/2 bottom-full z-50 mb-2 w-64 -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -111,6 +142,10 @@ export function FlightBlock({ flight, hourWidth, onSelect }: FlightBlockProps) {
               <Users className="h-3 w-3" />
               <span>{flight.passengers} pax</span>
             </div>
+          </div>
+
+          <div className="mt-2 pt-2 border-t border-border">
+            <p className="text-[10px] text-muted-foreground text-center">Drag to reassign stand</p>
           </div>
 
           <div className="absolute left-1/2 top-full -translate-x-1/2 border-8 border-transparent border-t-border" />
