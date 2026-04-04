@@ -80,10 +80,30 @@ export function FlightBlock({
           isConflicting && "bg-red-600 border-red-400"
         )}
       >
-        <GripVertical className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
-        <TypeIcon className="h-3 w-3 shrink-0" />
-        <span className="truncate font-semibold">{flight.flightNumber}</span>
-        {flight.status === "delayed" && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />}
+        {/* Delay badge on left edge */}
+        {flight.delayMinutes && (
+          <div className="absolute left-0 top-0 bottom-0 flex items-center">
+            <div className="bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-r shadow-md flex items-center gap-0.5">
+              <span>+{flight.delayMinutes}m</span>
+            </div>
+          </div>
+        )}
+        
+        <div className={cn("flex items-center gap-1 flex-1", flight.delayMinutes && "pl-6")}>
+          <GripVertical className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+          <TypeIcon className="h-3 w-3 shrink-0" />
+          <span className="truncate font-semibold">{flight.flightNumber}</span>
+          {flight.status === "delayed" && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />}
+        </div>
+
+        {/* Delay badge on right edge for longer delays (100+ min) */}
+        {flight.delayMinutes && flight.delayMinutes >= 100 && (
+          <div className="absolute right-0 top-0 bottom-0 flex items-center">
+            <div className="bg-red-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-l shadow-md">
+              {flight.delayMinutes >= 60 ? `${Math.floor(flight.delayMinutes / 60)}h${flight.delayMinutes % 60}m` : `+${flight.delayMinutes}m`}
+            </div>
+          </div>
+        )}
       </div>
 
       {showTooltip && !isDragging && (
@@ -143,6 +163,17 @@ export function FlightBlock({
               <span>{flight.passengers} pax</span>
             </div>
           </div>
+
+          {flight.delayMinutes && (
+            <div className="mt-2 flex items-center gap-2 rounded bg-amber-500/20 px-2 py-1.5 text-xs">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+              <span className="font-medium text-amber-400">
+                Delayed: +{flight.delayMinutes >= 60 
+                  ? `${Math.floor(flight.delayMinutes / 60)}h ${flight.delayMinutes % 60}min` 
+                  : `${flight.delayMinutes} min`}
+              </span>
+            </div>
+          )}
 
           <div className="mt-2 pt-2 border-t border-border">
             <p className="text-[10px] text-muted-foreground text-center">Drag to reassign stand</p>

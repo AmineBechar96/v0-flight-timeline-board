@@ -18,6 +18,7 @@ export interface Flight {
   status: FlightStatus
   passengers?: number
   gate?: string
+  delayMinutes?: number // delay in minutes (1-400), undefined if no delay
 }
 
 export interface MaintenanceZone {
@@ -103,6 +104,22 @@ export function generateFlights(): Flight[] {
       const type = flightTypes[Math.floor(Math.random() * flightTypes.length)]
       const duration = type === "turnaround" ? 1.5 + Math.random() * 2 : 0.5 + Math.random() * 1.5
       const status = statuses[Math.floor(Math.random() * statuses.length)]
+      
+      // Generate delay for some flights (about 25% chance, weighted towards shorter delays)
+      let delayMinutes: number | undefined = undefined
+      if (Math.random() < 0.25) {
+        // Weighted distribution: more short delays, fewer long delays
+        const delayRandom = Math.random()
+        if (delayRandom < 0.5) {
+          delayMinutes = Math.floor(Math.random() * 30) + 1 // 1-30 min (50% chance)
+        } else if (delayRandom < 0.8) {
+          delayMinutes = Math.floor(Math.random() * 70) + 31 // 31-100 min (30% chance)
+        } else if (delayRandom < 0.95) {
+          delayMinutes = Math.floor(Math.random() * 100) + 101 // 101-200 min (15% chance)
+        } else {
+          delayMinutes = Math.floor(Math.random() * 200) + 201 // 201-400 min (5% chance)
+        }
+      }
 
       flights.push({
         id: `FL-${String(flightId++).padStart(4, "0")}`,
@@ -120,6 +137,7 @@ export function generateFlights(): Flight[] {
         status,
         passengers: Math.floor(Math.random() * 300) + 50,
         gate: `G${Math.floor(Math.random() * 50) + 1}`,
+        delayMinutes,
       })
 
       currentTime += duration + 0.5 + Math.random() * 3 // Gap between flights
