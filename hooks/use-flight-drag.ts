@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import type { Flight } from "@/lib/mock-flights"
+import type { Flight } from "@/lib/types"
 
 const BUFFER_MINUTES = 15
 const BUFFER_HOURS = BUFFER_MINUTES / 60

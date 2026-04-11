@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { TimelineHeader } from "@/components/timeline-header"
 import { TimelineLegend } from "@/components/timeline-legend"
 import { TimelineGrid, type TimelineGridHandle } from "@/components/timeline-grid"
@@ -8,12 +8,13 @@ import { FilterControls, type FilterState } from "@/components/filter-controls"
 import { ZoomControls } from "@/components/zoom-controls"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { FlightDetailPanel } from "@/components/flight-detail-panel"
-import { generateFlights, generateMaintenanceZones, type Flight } from "@/lib/mock-flights"
+import type { Flight, Airline } from "@/lib/types"
+import type { MaintenanceZone } from "@/lib/types"
+import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3]
 
 export default function StandAllocationBoard() {
-  const [refreshKey, setRefreshKey] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [showHelp, setShowHelp] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
@@ -24,22 +25,38 @@ export default function StandAllocationBoard() {
     statuses: [],
   })
   const gridRef = useRef<TimelineGridHandle>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const [flightsData, setFlightsData] = useState<Flight[]>([])
-  const maintenanceZones = useMemo(() => generateMaintenanceZones(), [refreshKey])
+  const [standsData, setStandsData] = useState<string[]>([])
+  const [airlinesData, setAirlinesData] = useState<Airline[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Generate flights on refresh
-  useMemo(() => {
-    setFlightsData(generateFlights())
-  }, [refreshKey])
+  // No maintenance zones in the DB — empty array
+  const maintenanceZones: MaintenanceZone[] = []
+
+  // Fetch data from Supabase
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    const [stands, airlines, flights] = await Promise.all([
+      fetchStands(),
+      fetchAirlines(),
+      fetchFlights(),
+    ])
+    setStandsData(stands.map((s) => s.id))
+    setAirlinesData(airlines)
+    setFlightsData(flights)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const allFlights = flightsData
 
   // Filter flights based on current filters
   const flights = useMemo(() => {
     return allFlights.filter((flight) => {
-      // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
         const matchesSearch =
@@ -53,17 +70,14 @@ export default function StandAllocationBoard() {
         if (!matchesSearch) return false
       }
 
-      // Airline filter
       if (filters.airlines.length > 0) {
         if (!filters.airlines.includes(flight.airlineCode)) return false
       }
 
-      // Connection type filter
       if (filters.connectionTypes.length > 0) {
         if (!filters.connectionTypes.includes(flight.type)) return false
       }
 
-      // Status filter
       if (filters.statuses.length > 0) {
         if (!filters.statuses.includes(flight.status)) return false
       }
@@ -72,7 +86,7 @@ export default function StandAllocationBoard() {
     })
   }, [allFlights, filters])
 
-  // Calculate active flights (currently in progress based on current time)
+  // Calculate active flights
   const activeFlights = useMemo(() => {
     const now = new Date()
     const currentHour = now.getHours() + now.getMinutes() / 60
@@ -86,8 +100,8 @@ export default function StandAllocationBoard() {
   }, [flights])
 
   const handleRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-  }, [])
+    loadData()
+  }, [loadData])
 
   const handleZoomIn = useCallback(() => {
     const currentIndex = ZOOM_LEVELS.indexOf(zoom)
@@ -108,7 +122,6 @@ export default function StandAllocationBoard() {
   }, [])
 
   const handleFocusSearch = useCallback(() => {
-    // Find the search input and focus it
     const searchInput = document.querySelector('input[placeholder="Search flights..."]') as HTMLInputElement
     searchInput?.focus()
   }, [])
@@ -134,13 +147,39 @@ export default function StandAllocationBoard() {
     setSelectedFlight(null)
   }, [])
 
-  const handleFlightReassign = useCallback((flightId: string, newStand: string) => {
+  const handleFlightReassign = useCallback(async (flightId: string, newStand: string) => {
+    const flight = flightsData.find((f) => f.id === flightId)
+    if (!flight) return
+
+    // Optimistic update
     setFlightsData((prev) =>
-      prev.map((flight) =>
-        flight.id === flightId ? { ...flight, stand: newStand } : flight
+      prev.map((f) =>
+        f.id === flightId ? { ...f, stand: newStand } : f
       )
     )
-  }, [])
+
+    // Persist to DB
+    const success = await reassignFlightStand(flightId, flight.stand, newStand)
+    if (!success) {
+      // Revert on failure
+      setFlightsData((prev) =>
+        prev.map((f) =>
+          f.id === flightId ? { ...f, stand: flight.stand } : f
+        )
+      )
+    }
+  }, [flightsData])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading flight data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -151,9 +190,8 @@ export default function StandAllocationBoard() {
         onRefresh={handleRefresh}
       />
 
-      {/* Filter and Zoom Controls Bar */}
       <div className="flex items-center justify-between border-b border-border bg-card px-6 py-2">
-        <FilterControls filters={filters} onFiltersChange={setFilters} />
+        <FilterControls filters={filters} onFiltersChange={setFilters} airlines={airlinesData} />
         <div className="flex items-center gap-4">
           <button
             onClick={() => setShowHelp(true)}
@@ -166,8 +204,16 @@ export default function StandAllocationBoard() {
         </div>
       </div>
 
-      <TimelineLegend />
-      <TimelineGrid ref={gridRef} flights={flights} maintenanceZones={maintenanceZones} zoom={zoom} onFlightSelect={handleFlightSelect} onFlightReassign={handleFlightReassign} />
+      <TimelineLegend airlines={airlinesData} />
+      <TimelineGrid
+        ref={gridRef}
+        flights={flights}
+        maintenanceZones={maintenanceZones}
+        zoom={zoom}
+        stands={standsData}
+        onFlightSelect={handleFlightSelect}
+        onFlightReassign={handleFlightReassign}
+      />
 
       <KeyboardShortcuts
         isOpen={showHelp}

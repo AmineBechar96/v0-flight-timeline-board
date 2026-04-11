@@ -16,8 +16,8 @@ import {
   History,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Flight } from "@/lib/mock-flights"
-import { airlineColors } from "@/lib/mock-flights"
+import type { Flight } from "@/lib/types"
+import { airlineColors } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface FlightDetailPanelProps {

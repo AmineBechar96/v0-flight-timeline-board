@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(ls \"D:/bureau/scientif_research/optim/projects/airport management/data_architecture_for_UI/v0-flight-timeline-board - Copy/.env\"*)",
+      "Bash(npx next:*)",
+      "Bash(curl -s http://localhost:3099)",
+      "Bash(taskkill //F //IM next-server.exe)",
+      "Bash(ls -d */)",
+      "Bash(cmd.exe:*)"
+    ]
+  }
+}

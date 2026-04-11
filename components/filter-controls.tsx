@@ -12,22 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import type { FlightType, FlightStatus } from "@/lib/mock-flights"
-
-const airlines = [
-  { code: "BA", name: "British Airways" },
-  { code: "LH", name: "Lufthansa" },
-  { code: "AF", name: "Air France" },
-  { code: "KL", name: "KLM" },
-  { code: "EK", name: "Emirates" },
-  { code: "QR", name: "Qatar Airways" },
-  { code: "SQ", name: "Singapore Airlines" },
-  { code: "UA", name: "United Airlines" },
-  { code: "AA", name: "American Airlines" },
-  { code: "DL", name: "Delta Air Lines" },
-  { code: "EY", name: "Etihad Airways" },
-  { code: "TK", name: "Turkish Airlines" },
-]
+import type { FlightType, FlightStatus, Airline } from "@/lib/types"
 
 const connectionTypes: { value: FlightType; label: string }[] = [
   { value: "arrival", label: "Arrivals" },
@@ -53,9 +38,10 @@ export interface FilterState {
 interface FilterControlsProps {
   filters: FilterState
   onFiltersChange: (filters: FilterState) => void
+  airlines?: Airline[]
 }
 
-export function FilterControls({ filters, onFiltersChange }: FilterControlsProps) {
+export function FilterControls({ filters, onFiltersChange, airlines = [] }: FilterControlsProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const activeFilterCount =
@@ -194,12 +180,12 @@ export function FilterControls({ filters, onFiltersChange }: FilterControlsProps
           <DropdownMenuSeparator />
           {airlines.map((airline) => (
             <DropdownMenuCheckboxItem
-              key={airline.code}
-              checked={filters.airlines.includes(airline.code)}
-              onCheckedChange={() => toggleAirline(airline.code)}
+              key={airline.iataCode}
+              checked={filters.airlines.includes(airline.iataCode)}
+              onCheckedChange={() => toggleAirline(airline.iataCode)}
             >
-              <span className="mr-1 font-mono text-xs text-muted-foreground">{airline.code}</span>
-              {airline.name}
+              <span className="mr-1 font-mono text-xs text-muted-foreground">{airline.iataCode}</span>
+              {airline.fullName}
             </DropdownMenuCheckboxItem>
           ))}
         </DropdownMenuContent>
