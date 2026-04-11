@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Users, Clock, AlertTriangle, GripVertical } from "lucide-react"
-import type { Flight } from "@/lib/mock-flights"
-import { airlineColors, typeColors, statusColors } from "@/lib/mock-flights"
+import type { Flight } from "@/lib/types"
+import { airlineColors, typeColors, statusColors } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface FlightBlockProps {

@@ -1,8 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from "react"
-import type { Flight, MaintenanceZone } from "@/lib/mock-flights"
-import { stands } from "@/lib/mock-flights"
+import type { Flight, MaintenanceZone } from "@/lib/types"
 import { FlightBlock } from "./flight-block"
 import { MaintenanceBlock } from "./maintenance-block"
 import { cn } from "@/lib/utils"
@@ -13,6 +12,7 @@ interface TimelineGridProps {
   flights: Flight[]
   maintenanceZones: MaintenanceZone[]
   zoom: number
+  stands: string[]
   onFlightSelect?: (flight: Flight) => void
   onFlightReassign?: (flightId: string, newStand: string) => void
 }
@@ -26,7 +26,7 @@ const ROW_HEIGHT = 36 // pixels per stand row
 const HOURS = Array.from({ length: 25 }, (_, i) => i) // 0-24 hours
 
 export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
-  function TimelineGrid({ flights, maintenanceZones, zoom, onFlightSelect, onFlightReassign }, ref) {
+  function TimelineGrid({ flights, maintenanceZones, zoom, stands, onFlightSelect, onFlightReassign }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const [currentTimePosition, setCurrentTimePosition] = useState(0)
     const [draggedFlight, setDraggedFlight] = useState<Flight | null>(null)

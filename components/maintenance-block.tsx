@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Wrench, AlertCircle, Clock } from "lucide-react"
-import type { MaintenanceZone } from "@/lib/mock-flights"
+import type { MaintenanceZone } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface MaintenanceBlockProps {
