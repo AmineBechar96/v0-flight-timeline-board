@@ -4,6 +4,7 @@ import { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef, 
 import type { Flight, MaintenanceZone } from "@/lib/types"
 import { FlightBlock } from "./flight-block"
 import { MaintenanceBlock } from "./maintenance-block"
+import { StandEditModal } from "./stand-edit-modal"
 import { cn } from "@/lib/utils"
 import { checkConflict, type ConflictResult } from "@/hooks/use-flight-drag"
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
@@ -28,11 +29,15 @@ const HOURS = Array.from({ length: 25 }, (_, i) => i) // 0-24 hours
 export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
   function TimelineGrid({ flights, maintenanceZones, zoom, stands, onFlightSelect, onFlightReassign }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
+    const standScrollRef = useRef<HTMLDivElement>(null)
     const [currentTimePosition, setCurrentTimePosition] = useState(0)
     const [draggedFlight, setDraggedFlight] = useState<Flight | null>(null)
     const [targetStand, setTargetStand] = useState<string | null>(null)
     const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null)
     const [showDropFeedback, setShowDropFeedback] = useState<{ stand: string; success: boolean } | null>(null)
+    const [editingStand, setEditingStand] = useState<string | null>(null)
+    const [draggedStand, setDraggedStand] = useState<string | null>(null)
+    const [standOrder, setStandOrder] = useState<string[]>([])
 
     const hourWidth = BASE_HOUR_WIDTH * zoom
 
@@ -68,6 +73,58 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
         scrollRef.current.scrollLeft = Math.max(0, currentTimePosition - 300)
       }
     }, []) // Only on mount
+
+    // Initialize stand order
+    useEffect(() => {
+      setStandOrder(stands)
+    }, [stands])
+
+    // Sync vertical scroll between stand column and timeline area
+    useEffect(() => {
+      const scrollContainer = scrollRef.current
+      const standColumn = standScrollRef.current
+
+      if (!scrollContainer || !standColumn) return
+
+      const handleScroll = () => {
+        if (standColumn.scrollTop !== scrollContainer.scrollTop) {
+          standColumn.scrollTop = scrollContainer.scrollTop
+        }
+      }
+
+      scrollContainer.addEventListener("scroll", handleScroll)
+      return () => scrollContainer.removeEventListener("scroll", handleScroll)
+    }, [])
+
+    // Stand row drag handlers
+    const handleStandDragStart = useCallback((e: React.DragEvent, stand: string) => {
+      e.dataTransfer.setData("text/plain", stand)
+      e.dataTransfer.effectAllowed = "move"
+      setDraggedStand(stand)
+    }, [])
+
+    const handleStandDragOver = useCallback((e: React.DragEvent, targetStand: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+    }, [])
+
+    const handleStandDrop = useCallback((e: React.DragEvent, targetStand: string) => {
+      e.preventDefault()
+      const sourceStand = e.dataTransfer.getData("text/plain")
+      
+      if (sourceStand && sourceStand !== targetStand) {
+        setStandOrder(prev => {
+          const newOrder = [...prev]
+          const sourceIndex = newOrder.indexOf(sourceStand)
+          const targetIndex = newOrder.indexOf(targetStand)
+          newOrder.splice(sourceIndex, 1)
+          newOrder.splice(targetIndex, 0, sourceStand)
+          return newOrder
+        })
+      }
+      
+      setDraggedStand(null)
+    }, [])
 
     // Group flights by stand
     const flightsByStand = useMemo(() => {
@@ -191,13 +248,19 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
           <div className="flex h-10 items-center justify-center border-b border-border bg-muted/50 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Stand
           </div>
-          <div className="flex-1 overflow-hidden">
-            {stands.map((stand, index) => (
+          <div ref={standScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {(standOrder.length > 0 ? standOrder : stands).map((stand, index) => (
               <div
                 key={stand}
+                draggable
+                onDragStart={(e) => handleStandDragStart(e, stand)}
+                onDragOver={(e) => handleStandDragOver(e, stand)}
+                onDrop={(e) => handleStandDrop(e, stand)}
+                onClick={() => setEditingStand(stand)}
                 className={cn(
-                  "flex h-9 items-center justify-center border-b border-border text-sm font-medium transition-colors",
+                  "flex h-9 w-full items-center justify-center border-b border-border text-sm font-medium transition-all hover:bg-primary/10 hover:text-primary cursor-grab active:cursor-grabbing",
                   index % 2 === 0 ? "bg-card" : "bg-muted/30",
+                  draggedStand === stand && "opacity-50 bg-primary/20 ring-2 ring-primary",
                   targetStand === stand && !conflictResult?.hasConflict && "bg-emerald-500/20",
                   targetStand === stand && conflictResult?.hasConflict && "bg-red-500/20"
                 )}
@@ -256,11 +319,12 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
               )}
 
               {/* Stand rows */}
-              {stands.map((stand, index) => {
+              {(standOrder.length > 0 ? standOrder : stands).map((stand, index) => {
                 const isTarget = targetStand === stand
                 const hasConflict = isTarget && conflictResult?.hasConflict
                 const isAvailable = isTarget && !conflictResult?.hasConflict && draggedFlight?.stand !== stand
                 const feedbackForStand = showDropFeedback?.stand === stand
+                const isDragged = draggedStand === stand
 
                 return (
                   <div
@@ -268,6 +332,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                     className={cn(
                       "relative border-b border-border transition-colors",
                       index % 2 === 0 ? "bg-card" : "bg-muted/20",
+                      isDragged && "opacity-50 bg-primary/20 ring-2 ring-primary",
                       isTarget && "ring-2 ring-inset",
                       isAvailable && "bg-emerald-500/10 ring-emerald-500",
                       hasConflict && "bg-red-500/10 ring-red-500",
@@ -320,6 +385,21 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
             </div>
           </div>
         </div>
+
+        {/* Stand Edit Modal */}
+        <StandEditModal
+          isOpen={!!editingStand}
+          onClose={() => setEditingStand(null)}
+          standId={editingStand || undefined}
+          currentZoneId=""
+          currentCodeId=""
+          currentAirplanes=""
+          currentActive={true}
+          onSave={(data) => {
+            console.log("Save stand:", editingStand, data)
+            setEditingStand(null)
+          }}
+        />
       </div>
     )
   }

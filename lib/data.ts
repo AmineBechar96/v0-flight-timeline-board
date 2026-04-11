@@ -24,6 +24,46 @@ export async function fetchStands(): Promise<Stand[]> {
 }
 
 /**
+ * Fetch all zones from Supabase.
+ */
+export async function fetchZones(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from("zones")
+    .select("id, name")
+    .order("name")
+
+  if (error) {
+    console.error("Error fetching zones:", error)
+    return []
+  }
+
+  return (data ?? []).map((z) => ({
+    id: z.id,
+    name: z.name,
+  }))
+}
+
+/**
+ * Fetch all codes from Supabase.
+ */
+export async function fetchCodes(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from("codes")
+    .select("id, name")
+    .order("name")
+
+  if (error) {
+    console.error("Error fetching codes:", error)
+    return []
+  }
+
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+  }))
+}
+
+/**
  * Fetch all airlines from Supabase.
  */
 export async function fetchAirlines(): Promise<Airline[]> {
@@ -114,7 +154,7 @@ export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<F
   return allocations
     .filter((alloc) => alloc.flights && alloc.arr_time && alloc.dep_time)
     .map((alloc) => {
-      const f = alloc.flights as Record<string, unknown>
+      const f = alloc.flights as unknown as Record<string, unknown>
       const airlineCode = (f.airline as string) ?? ""
       const origin = f.origin as string | null
       const destination = f.destination as string | null
