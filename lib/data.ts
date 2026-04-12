@@ -29,8 +29,8 @@ export async function fetchStands(): Promise<Stand[]> {
 export async function fetchZones(): Promise<{ id: string; name: string }[]> {
   const { data, error } = await supabase
     .from("zones")
-    .select("id, name")
-    .order("name")
+    .select("id, description")
+    .order("id")
 
   if (error) {
     console.error("Error fetching zones:", error)
@@ -39,7 +39,7 @@ export async function fetchZones(): Promise<{ id: string; name: string }[]> {
 
   return (data ?? []).map((z) => ({
     id: z.id,
-    name: z.name,
+    name: z.description ?? z.id,
   }))
 }
 
@@ -49,8 +49,8 @@ export async function fetchZones(): Promise<{ id: string; name: string }[]> {
 export async function fetchCodes(): Promise<{ id: string; name: string }[]> {
   const { data, error } = await supabase
     .from("codes")
-    .select("id, name")
-    .order("name")
+    .select("id")
+    .order("id")
 
   if (error) {
     console.error("Error fetching codes:", error)
@@ -59,8 +59,30 @@ export async function fetchCodes(): Promise<{ id: string; name: string }[]> {
 
   return (data ?? []).map((c) => ({
     id: c.id,
-    name: c.name,
+    name: c.id,
   }))
+}
+
+/**
+ * Fetch all airplanes from Supabase, optionally filtered by code ID.
+ */
+export async function fetchAirplanes(codeId?: string): Promise<{ id: string; registration: string; aircraft_type: string; code_id?: string }[]> {
+  // Mock data since airplanes table doesn't exist in the provided schema
+  const mockAirplanes = [
+    { id: '1', registration: 'A6-EBA', aircraft_type: 'B777', code_id: 'E' },
+    { id: '2', registration: 'A6-EBB', aircraft_type: 'B777', code_id: 'E' },
+    { id: '3', registration: 'A6-ECA', aircraft_type: 'A380', code_id: 'F' },
+    { id: '4', registration: 'A6-EDA', aircraft_type: 'A320', code_id: 'C' },
+    { id: '5', registration: 'A6-EEA', aircraft_type: 'A330', code_id: 'D' },
+    { id: '6', registration: 'A6-EFA', aircraft_type: 'A320', code_id: 'C' },
+    { id: '7', registration: 'A6-EGA', aircraft_type: 'B787', code_id: 'D' },
+    { id: '8', registration: 'A6-EHA', aircraft_type: 'B737', code_id: 'C' },
+  ];
+  
+  if (codeId) {
+    return mockAirplanes.filter(a => a.code_id === codeId);
+  }
+  return mockAirplanes;
 }
 
 /**

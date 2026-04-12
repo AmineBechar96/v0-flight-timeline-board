@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from "react"
-import type { Flight, MaintenanceZone } from "@/lib/types"
+import type { Flight, MaintenanceZone, Stand } from "@/lib/types"
 import { FlightBlock } from "./flight-block"
 import { MaintenanceBlock } from "./maintenance-block"
 import { StandEditModal } from "./stand-edit-modal"
@@ -13,7 +13,7 @@ interface TimelineGridProps {
   flights: Flight[]
   maintenanceZones: MaintenanceZone[]
   zoom: number
-  stands: string[]
+  stands: Stand[]
   onFlightSelect?: (flight: Flight) => void
   onFlightReassign?: (flightId: string, newStand: string) => void
 }
@@ -35,9 +35,9 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
     const [targetStand, setTargetStand] = useState<string | null>(null)
     const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null)
     const [showDropFeedback, setShowDropFeedback] = useState<{ stand: string; success: boolean } | null>(null)
-    const [editingStand, setEditingStand] = useState<string | null>(null)
+    const [editingStand, setEditingStand] = useState<Stand | null>(null)
     const [draggedStand, setDraggedStand] = useState<string | null>(null)
-    const [standOrder, setStandOrder] = useState<string[]>([])
+    const [standOrder, setStandOrder] = useState<Stand[]>([])
 
     const hourWidth = BASE_HOUR_WIDTH * zoom
 
@@ -75,8 +75,10 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
     }, []) // Only on mount
 
     // Sort stands: 1, 2... 18, 19, 1a, 1b, 1c, 20, 21, 22
-    const sortStands = (stands: string[]) => {
-      return [...stands].sort((a, b) => {
+    const sortStands = (stands: Stand[]) => {
+      return [...stands].sort((standA, standB) => {
+        const a = standA.id
+        const b = standB.id
         const matchA = a.match(/^(\d+)(.*)$/)
         const matchB = b.match(/^(\d+)(.*)$/)
         if (!matchA || !matchB) return a.localeCompare(b)
@@ -162,10 +164,12 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
       if (sourceStand && sourceStand !== targetStand) {
         setStandOrder(prev => {
           const newOrder = [...prev]
-          const sourceIndex = newOrder.indexOf(sourceStand)
-          const targetIndex = newOrder.indexOf(targetStand)
+          const sourceIndex = newOrder.findIndex(s => s.id === sourceStand)
+          const targetIndex = newOrder.findIndex(s => s.id === targetStand)
+          if (sourceIndex === -1 || targetIndex === -1) return prev
+          const sourceItem = newOrder[sourceIndex]
           newOrder.splice(sourceIndex, 1)
-          newOrder.splice(targetIndex, 0, sourceStand)
+          newOrder.splice(targetIndex, 0, sourceItem)
           return newOrder
         })
       }
@@ -176,20 +180,20 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
     // Group flights by stand
     const flightsByStand = useMemo(() => {
       const grouped: Record<string, Flight[]> = {}
-      for (const stand of stands) {
-        grouped[stand] = flights.filter((f) => f.stand === stand)
+      for (const standObj of stands) {
+        grouped[standObj.id] = flights.filter((f) => f.stand === standObj.id)
       }
       return grouped
-    }, [flights])
+    }, [flights, stands])
 
     // Group maintenance zones by stand
     const maintenanceByStand = useMemo(() => {
       const grouped: Record<string, MaintenanceZone[]> = {}
-      for (const stand of stands) {
-        grouped[stand] = maintenanceZones.filter((m) => m.stand === stand)
+      for (const standObj of stands) {
+        grouped[standObj.id] = maintenanceZones.filter((m) => m.stand === standObj.id)
       }
       return grouped
-    }, [maintenanceZones])
+    }, [maintenanceZones, stands])
 
     const formatHour = (hour: number) => {
       return `${String(hour % 24).padStart(2, "0")}:00`
@@ -296,14 +300,16 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
             Stand
           </div>
           <div ref={standScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {(standOrder.length > 0 ? standOrder : stands).map((stand, index) => (
+            {(standOrder.length > 0 ? standOrder : stands).map((standObj, index) => {
+              const stand = standObj.id
+              return (
               <div
                 key={stand}
                 draggable
                 onDragStart={(e) => handleStandDragStart(e, stand)}
                 onDragOver={(e) => handleStandDragOver(e, stand)}
                 onDrop={(e) => handleStandDrop(e, stand)}
-                onClick={() => setEditingStand(stand)}
+                onClick={() => setEditingStand(standObj)}
                 className={cn(
                   "flex h-9 w-full items-center justify-center border-b border-border text-sm font-medium transition-all hover:bg-primary/10 hover:text-primary hover:cursor-pointer active:cursor-grabbing",
                   index % 2 === 0 ? "bg-card" : "bg-muted/30",
@@ -314,7 +320,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
               >
                 <span className="text-foreground">{stand}</span>
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -366,7 +372,8 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
               )}
 
               {/* Stand rows */}
-              {(standOrder.length > 0 ? standOrder : stands).map((stand, index) => {
+              {(standOrder.length > 0 ? standOrder : stands).map((standObj, index) => {
+                const stand = standObj.id
                 const isTarget = targetStand === stand
                 const hasConflict = isTarget && conflictResult?.hasConflict
                 const isAvailable = isTarget && !conflictResult?.hasConflict && draggedFlight?.stand !== stand
@@ -437,13 +444,13 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
         <StandEditModal
           isOpen={!!editingStand}
           onClose={() => setEditingStand(null)}
-          standId={editingStand || undefined}
-          currentZoneId=""
-          currentCodeId=""
+          standId={editingStand?.id}
+          currentZoneId={editingStand?.zone || ""}
+          currentCodeId={editingStand?.code || ""}
           currentAirplanes=""
-          currentActive={true}
+          currentActive={editingStand ? !editingStand.isClosed : true}
           onSave={(data) => {
-            console.log("Save stand:", editingStand, data)
+            console.log("Save stand:", editingStand?.id, data)
             setEditingStand(null)
           }}
         />

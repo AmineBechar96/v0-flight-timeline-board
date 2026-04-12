@@ -7,7 +7,7 @@ import { FilterControls, type FilterState } from "@/components/filter-controls"
 import { ZoomControls } from "@/components/zoom-controls"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { FlightDetailPanel } from "@/components/flight-detail-panel"
-import type { Flight, Airline } from "@/lib/types"
+import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
 import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
 
@@ -26,7 +26,7 @@ export default function StandAllocationBoard() {
   const gridRef = useRef<TimelineGridHandle>(null)
 
   const [flightsData, setFlightsData] = useState<Flight[]>([])
-  const [standsData, setStandsData] = useState<string[]>([])
+  const [standsData, setStandsData] = useState<Stand[]>([])
   const [airlinesData, setAirlinesData] = useState<Airline[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -41,7 +41,7 @@ export default function StandAllocationBoard() {
       fetchAirlines(),
       fetchFlights(),
     ])
-    setStandsData(stands.map((s) => s.id))
+    setStandsData(stands)
     setAirlinesData(airlines)
     setFlightsData(flights)
     setLoading(false)
