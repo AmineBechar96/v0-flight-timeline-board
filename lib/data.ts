@@ -122,7 +122,7 @@ function deriveFlightType(origin?: string | null, destination?: string | null): 
  */
 function timestampToHours(timestamp: string): number {
   const date = new Date(timestamp)
-  return date.getUTCHours() + date.getUTCMinutes() / 60
+  return date.getHours() + date.getMinutes() / 60
 }
 
 /**

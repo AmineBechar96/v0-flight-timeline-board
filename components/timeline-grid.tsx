@@ -74,7 +74,8 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
       }
     }, []) // Only on mount
 
-    // Sort stands: 1, 2... 18, 19, 1a, 1b, 1c, 20, 21, 22
+    // Sort stands: 1,2,3,4,5,6,7,8,9,1A,1B,1C,10,11,12...
+    // Pattern: 1-9 no suffix, 1-9 with suffix, 10+ no suffix, 10+ with suffix
     const sortStands = (stands: Stand[]) => {
       return [...stands].sort((standA, standB) => {
         const a = standA.id
@@ -83,42 +84,33 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
         const matchB = b.match(/^(\d+)(.*)$/)
         if (!matchA || !matchB) return a.localeCompare(b)
         
-        const numStrA = matchA[1]
-        const numStrB = matchB[1]
+        const numA = parseInt(matchA[1], 10)
+        const numB = parseInt(matchB[1], 10)
         const suffixA = matchA[2]
         const suffixB = matchB[2]
-        const numA = parseInt(numStrA, 10)
-        const numB = parseInt(numStrB, 10)
+        const hasSuffixA = suffixA !== ""
+        const hasSuffixB = suffixB !== ""
         
-        // Compare by numeric prefix length first
-        if (numStrA.length !== numStrB.length) {
-          // Shorter prefix comes first (e.g., "1" before "18" before "100")
-          // UNLESS the shorter one has a suffix that extends into the longer one's range
-          if (suffixA && !suffixB) {
-            // e.g., 1a vs 19: 1a's effective range is 10-19, so 1a should come after 19
-            if (numA * 10 <= numB) return 1 // a (1a) comes after b (19)
-            return -1
-          }
-          if (!suffixA && suffixB) {
-            // e.g., 19 vs 1a: 19 should come before 1a
-            if (numA <= numB * 10) return -1 // a (19) comes before b (1a)
-            return 1
-          }
-          // Neither has suffix or both have suffix - compare by length
-          return numStrA.length - numStrB.length
+        // Calculate group: 0 = 1-9 no suffix, 1 = 1-9 with suffix, 2 = 10+ no suffix, 3 = 10+ with suffix
+        const getGroup = (num: number, hasSuffix: boolean) => {
+          if (num <= 9) return hasSuffix ? 1 : 0
+          return hasSuffix ? 3 : 2
         }
         
-        // Same prefix length - compare by number
+        const groupA = getGroup(numA, hasSuffixA)
+        const groupB = getGroup(numB, hasSuffixB)
+        
+        // First compare by group
+        if (groupA !== groupB) {
+          return groupA - groupB
+        }
+        
+        // Same group - compare by number
         if (numA !== numB) {
-          // If one has suffix and other doesn't, suffix comes after
-          if (suffixA === "" && suffixB !== "") return -1
-          if (suffixA !== "" && suffixB === "") return 1
           return numA - numB
         }
         
-        // Same number - sort by suffix (empty first, then alphabetical)
-        if (suffixA === "" && suffixB !== "") return -1
-        if (suffixA !== "" && suffixB === "") return 1
+        // Same number - sort by suffix alphabetically
         return suffixA.localeCompare(suffixB)
       })
     }

@@ -6,14 +6,7 @@ import {
   PlaneLanding,
   PlaneTakeoff,
   ArrowLeftRight,
-  Users,
-  Clock,
   Plane,
-  MapPin,
-  AlertTriangle,
-  ArrowRight,
-  MessageSquare,
-  History,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Flight } from "@/lib/types"
@@ -24,15 +17,6 @@ interface FlightDetailPanelProps {
   flight: Flight | null
   onClose: () => void
 }
-
-// Simplified turnaround phases with requested percentages (10%, 25%, 30%, 25%, 10%)
-const turnaroundPhases = [
-  { id: "arrival", name: "Arrival", percent: 10, color: "bg-emerald-500" },
-  { id: "deplaning", name: "Deplaning", percent: 25, color: "bg-blue-500" },
-  { id: "cleaning", name: "Cleaning", percent: 30, color: "bg-amber-500" },
-  { id: "boarding", name: "Boarding", percent: 25, color: "bg-sky-500" },
-  { id: "departure", name: "Departure", percent: 10, color: "bg-rose-500" },
-]
 
 export function FlightDetailPanel({ flight, onClose }: FlightDetailPanelProps) {
   // Handle escape key
@@ -65,8 +49,6 @@ export function FlightDetailPanel({ flight, onClose }: FlightDetailPanelProps) {
   const airlineColor = airlineColors[flight.airlineCode] || "bg-gray-600 border-gray-400"
   const flightDurationMinutes = Math.round(flight.duration * 60)
 
-  // Aircraft size category
-  const aircraftSize = ["A380", "B777", "B787", "A350"].includes(flight.aircraftType) ? "Wide-body" : "Narrow-body"
 
   return (
     <>
@@ -166,7 +148,7 @@ export function FlightDetailPanel({ flight, onClose }: FlightDetailPanelProps) {
               <div className="flex items-center justify-between py-1 border-t border-border/50">
                 <span className="font-mono text-xs text-muted-foreground">Aircraft</span>
                 <span className="font-mono text-xs text-foreground">
-                  {flight.aircraftType} <span className="text-muted-foreground">({aircraftSize})</span>
+                  {flight.aircraftType}
                 </span>
               </div>
               <div className="flex items-center justify-between py-1 border-t border-border/50">
@@ -198,70 +180,6 @@ export function FlightDetailPanel({ flight, onClose }: FlightDetailPanelProps) {
                 <span className="font-mono text-xs text-muted-foreground">Ground Time</span>
                 <span className="font-mono text-xs font-semibold text-primary">{flightDurationMinutes} min</span>
               </div>
-            </div>
-          </section>
-
-          {/* Turnaround Timeline - Simplified Gantt */}
-          <section>
-            <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Turnaround Timeline
-            </h3>
-            <div className="rounded-lg border border-border bg-secondary/30 p-3">
-              {/* Mini Gantt bar */}
-              <div className="mb-3 flex h-6 overflow-hidden rounded bg-muted">
-                {turnaroundPhases.map((phase, index) => (
-                  <div
-                    key={phase.id}
-                    className={cn(
-                      phase.color,
-                      "h-full flex items-center justify-center transition-all",
-                      index === 0 && "rounded-l",
-                      index === turnaroundPhases.length - 1 && "rounded-r"
-                    )}
-                    style={{ width: `${phase.percent}%` }}
-                    title={`${phase.name}: ${phase.percent}%`}
-                  >
-                    {phase.percent >= 20 && (
-                      <span className="font-mono text-[9px] font-bold text-white/90">{phase.percent}%</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Phase labels */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {turnaroundPhases.map((phase) => (
-                  <div key={phase.id} className="flex items-center gap-1.5">
-                    <div className={cn("h-2 w-2 rounded-sm", phase.color)} />
-                    <span className="font-mono text-[10px] text-muted-foreground">{phase.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Actions Section */}
-          <section>
-            <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Actions
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="secondary" className="justify-start gap-2 font-mono text-xs h-9">
-                <ArrowRight className="h-3.5 w-3.5" />
-                Reassign Stand
-              </Button>
-              <Button variant="secondary" className="justify-start gap-2 font-mono text-xs h-9">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Mark Delayed
-              </Button>
-              <Button variant="secondary" className="justify-start gap-2 font-mono text-xs h-9">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Add Note
-              </Button>
-              <Button variant="secondary" className="justify-start gap-2 font-mono text-xs h-9">
-                <History className="h-3.5 w-3.5" />
-                View History
-              </Button>
             </div>
           </section>
         </div>

@@ -127,8 +127,8 @@ export function FlightBlock({
               <p className="font-medium text-foreground">{flight.aircraftType} · {flight.registration}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Stand / Gate</p>
-              <p className="font-medium text-foreground">{flight.stand} / {flight.gate}</p>
+              <p className="text-muted-foreground">Stand</p>
+              <p className="font-medium text-foreground">{flight.stand}</p>
             </div>
             {flight.origin && (
               <div>

@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { fetchZones, fetchCodes, fetchAirplanes } from "@/lib/data"
+import { fetchCodes, fetchAirplanes } from "@/lib/data"
 
 interface StandEditModalProps {
   isOpen: boolean
@@ -55,11 +55,10 @@ export function StandEditModal({
   const [active, setActive] = useState(currentActive)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
-  const [zones, setZones] = useState<{ id: string; name: string }[]>([])
   const [codes, setCodes] = useState<{ id: string; name: string }[]>([])
   const [allAirplanes, setAllAirplanes] = useState<{ id: string; registration: string; aircraft_type: string; code_id?: string }[]>([])
   const [selectedAirplaneIds, setSelectedAirplaneIds] = useState<string[]>([])
-  const [formErrors, setFormErrors] = useState<{ zone?: string; code?: string; airplanes?: string }>({})
+  const [formErrors, setFormErrors] = useState<{ code?: string; airplanes?: string }>({})
 
   // Fetch zones, codes, and all airplanes when modal opens
   useEffect(() => {
@@ -71,9 +70,8 @@ export function StandEditModal({
       
       // Load all reference data in parallel
       setIsLoadingData(true)
-      Promise.all([fetchZones(), fetchCodes(), fetchAirplanes()])
-        .then(([zonesData, codesData, airplanesData]) => {
-          setZones(zonesData)
+      Promise.all([fetchCodes(), fetchAirplanes()])
+        .then(([codesData, airplanesData]) => {
           setCodes(codesData)
           setAllAirplanes(airplanesData)
           
@@ -84,7 +82,6 @@ export function StandEditModal({
           }
         })
         .catch(() => {
-          setZones([])
           setCodes([])
           setAllAirplanes([])
           setSelectedAirplaneIds([])
@@ -108,18 +105,14 @@ export function StandEditModal({
   const airplaneList = allAirplanes.filter(a => !codeId || a.code_id === codeId)
 
   const validateForm = () => {
-    const errors: { zone?: string; code?: string; airplanes?: string } = {}
-    
-    if (!zoneId.trim()) {
-      errors.zone = "Please select a zone"
-    }
+    const errors: { code?: string; airplanes?: string } = {}
     
     if (!codeId.trim()) {
       errors.code = "Please select a code"
     }
     
     if (selectedAirplaneIds.length === 0) {
-      errors.airplanes = "Please select at least one airplane"
+      errors.airplanes = "Please select at least one aircraft"
     }
     
     setFormErrors(errors)
@@ -155,7 +148,6 @@ export function StandEditModal({
     onClose()
   }
 
-  const getZoneName = (id: string) => zones.find(z => z.id === id)?.name || id
   const getCodeName = (id: string) => codes.find(c => c.id === id)?.name || id
 
   const toggleAirplane = (registration: string) => {
@@ -166,10 +158,10 @@ export function StandEditModal({
   }
 
   const airplaneDisplayText = selectedAirplaneIds.length === 0 
-    ? "Select airplanes..."
+    ? "Select aircrafts..."
     : selectedAirplaneIds.length === 1 
       ? selectedAirplaneIds[0]
-      : `${selectedAirplaneIds.length} airplanes selected`
+      : `${selectedAirplaneIds.length} aircrafts selected`
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -199,7 +191,7 @@ export function StandEditModal({
         <form onSubmit={handleSubmit} className="relative z-10 space-y-6">
           {/* Form Fields */}
           <div className="space-y-5">
-            {/* Zone Selection */}
+            {/* Zone Display */}
             <div className="group relative">
               <label className="flex items-center gap-2 text-sm font-medium text-foreground/80 mb-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary/10">
@@ -207,46 +199,14 @@ export function StandEditModal({
                 </span>
                 Zone
               </label>
-              
-              {isLoadingData ? (
-                <div className="flex items-center justify-center h-12 rounded-md border border-input bg-muted/30">
-                  <span className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                  <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+              <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                    <Layers className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{zoneId || "—"}</span>
                 </div>
-              ) : zones.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {zones.map((z) => (
-                    <button
-                      key={z.id}
-                      type="button"
-                      onClick={() => {
-                        setZoneId(z.id)
-                        setFormErrors(prev => ({ ...prev, zone: undefined }))
-                      }}
-                      disabled={isSubmitting}
-                      className={`relative h-10 rounded-lg border text-sm font-medium transition-all duration-200 ${
-                        zoneId === z.id
-                          ? "bg-primary/20 border-primary text-primary shadow-md"
-                          : "bg-card border-input hover:border-primary/50 hover:bg-primary/5"
-                      }`}
-                    >
-                      <span className="relative z-10">{z.id}</span>
-                      {zoneId === z.id && (
-                        <span className="absolute inset-0 rounded-lg bg-primary/10 animate-pulse" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No zones available</p>
-              )}
-              
-              {formErrors.zone && (
-                <p className="mt-1.5 text-xs text-destructive flex items-center gap-1 animate-in slide-in-from-top-1">
-                  <span className="inline-block w-1 h-1 rounded-full bg-destructive" />
-                  {formErrors.zone}
-                </p>
-              )}
+              </div>
             </div>
 
             {/* Code Selection */}
@@ -299,13 +259,13 @@ export function StandEditModal({
               )}
             </div>
 
-            {/* Airplanes Field */}
+            {/* Aircrafts Field */}
             <div className="group relative">
               <label className="flex items-center gap-2 text-sm font-medium text-foreground/80 mb-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary/10">
                   <Plane className="h-3 w-3 text-primary" />
                 </span>
-                Airplanes
+                Aircrafts
               </label>
               
               <DropdownMenu>
@@ -320,11 +280,11 @@ export function StandEditModal({
                     <span className="flex items-center gap-2 truncate">
                       <Plane className="h-4 w-4 text-muted-foreground" />
                       {isLoadingData 
-                        ? "Loading airplanes..." 
+                        ? "Loading aircrafts..." 
                         : !codeId 
                           ? "Select a code first" 
                           : airplaneList.length === 0 
-                            ? "No airplanes available for this code" 
+                            ? "No aircrafts available for this code" 
                             : airplaneDisplayText}
                     </span>
                     <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -332,7 +292,7 @@ export function StandEditModal({
                 </DropdownMenuTrigger>
                 {codeId && airplaneList.length > 0 && !isLoadingData && (
                   <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-64 overflow-y-auto">
-                    <DropdownMenuLabel className="text-xs">Available Airplanes</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-xs">Available Aircrafts</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {airplaneList.map((airplane) => (
                       <DropdownMenuCheckboxItem
