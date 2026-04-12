@@ -94,12 +94,12 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
           placeholder="Search flights..."
           value={filters.search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="h-8 w-48 bg-secondary pl-8 text-sm"
+          className="h-8 w-48 bg-secondary pl-8 text-sm hover:cursor-pointer"
         />
         {filters.search && (
           <button
             onClick={() => handleSearchChange("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:cursor-pointer"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -109,7 +109,7 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
       {/* Connection Type Filter */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 hover:cursor-pointer">
             Connection
             {filters.connectionTypes.length > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
@@ -137,7 +137,7 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
       {/* Status Filter */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 hover:cursor-pointer">
             Status
             {filters.statuses.length > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
@@ -165,7 +165,7 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
       {/* Airline Filter */}
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 hover:cursor-pointer">
             Airline
             {filters.airlines.length > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
@@ -197,7 +197,7 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
           variant="ghost"
           size="sm"
           onClick={clearAllFilters}
-          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:cursor-pointer"
         >
           <X className="h-3.5 w-3.5" />
           Clear ({activeFilterCount})

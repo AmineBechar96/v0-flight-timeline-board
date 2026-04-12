@@ -37,7 +37,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
         size="sm"
         onClick={handleZoomOut}
         disabled={currentIndex === 0}
-        className="h-7 w-7 p-0"
+        className="h-7 w-7 p-0 hover:cursor-pointer"
         title="Zoom Out (Ctrl+-)"
       >
         <ZoomOut className="h-4 w-4" />
@@ -49,7 +49,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
             key={level}
             onClick={() => onZoomChange(level)}
             className={cn(
-              "flex h-7 min-w-[2.5rem] items-center justify-center px-1.5 text-xs font-medium transition-colors",
+              "flex h-7 min-w-[2.5rem] items-center justify-center px-1.5 text-xs font-medium transition-colors hover:cursor-pointer",
               zoom === level
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -66,7 +66,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
         size="sm"
         onClick={handleZoomIn}
         disabled={currentIndex === ZOOM_LEVELS.length - 1}
-        className="h-7 w-7 p-0"
+        className="h-7 w-7 p-0 hover:cursor-pointer"
         title="Zoom In (Ctrl++)"
       >
         <ZoomIn className="h-4 w-4" />
@@ -78,7 +78,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
         variant="ghost"
         size="sm"
         onClick={handleReset}
-        className="h-7 w-7 p-0"
+        className="h-7 w-7 p-0 hover:cursor-pointer"
         title="Reset Zoom (Ctrl+0)"
       >
         <Maximize2 className="h-4 w-4" />

@@ -84,11 +84,11 @@ export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, 
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2 hover:cursor-pointer">
               <Filter className="h-4 w-4" />
               Filter
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={onRefresh}>
+            <Button variant="outline" size="sm" className="gap-2 hover:cursor-pointer" onClick={onRefresh}>
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>

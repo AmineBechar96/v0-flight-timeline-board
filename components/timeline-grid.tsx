@@ -74,9 +74,56 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
       }
     }, []) // Only on mount
 
+    // Sort stands: 1, 2... 18, 19, 1a, 1b, 1c, 20, 21, 22
+    const sortStands = (stands: string[]) => {
+      return [...stands].sort((a, b) => {
+        const matchA = a.match(/^(\d+)(.*)$/)
+        const matchB = b.match(/^(\d+)(.*)$/)
+        if (!matchA || !matchB) return a.localeCompare(b)
+        
+        const numStrA = matchA[1]
+        const numStrB = matchB[1]
+        const suffixA = matchA[2]
+        const suffixB = matchB[2]
+        const numA = parseInt(numStrA, 10)
+        const numB = parseInt(numStrB, 10)
+        
+        // Compare by numeric prefix length first
+        if (numStrA.length !== numStrB.length) {
+          // Shorter prefix comes first (e.g., "1" before "18" before "100")
+          // UNLESS the shorter one has a suffix that extends into the longer one's range
+          if (suffixA && !suffixB) {
+            // e.g., 1a vs 19: 1a's effective range is 10-19, so 1a should come after 19
+            if (numA * 10 <= numB) return 1 // a (1a) comes after b (19)
+            return -1
+          }
+          if (!suffixA && suffixB) {
+            // e.g., 19 vs 1a: 19 should come before 1a
+            if (numA <= numB * 10) return -1 // a (19) comes before b (1a)
+            return 1
+          }
+          // Neither has suffix or both have suffix - compare by length
+          return numStrA.length - numStrB.length
+        }
+        
+        // Same prefix length - compare by number
+        if (numA !== numB) {
+          // If one has suffix and other doesn't, suffix comes after
+          if (suffixA === "" && suffixB !== "") return -1
+          if (suffixA !== "" && suffixB === "") return 1
+          return numA - numB
+        }
+        
+        // Same number - sort by suffix (empty first, then alphabetical)
+        if (suffixA === "" && suffixB !== "") return -1
+        if (suffixA !== "" && suffixB === "") return 1
+        return suffixA.localeCompare(suffixB)
+      })
+    }
+
     // Initialize stand order
     useEffect(() => {
-      setStandOrder(stands)
+      setStandOrder(sortStands(stands))
     }, [stands])
 
     // Sync vertical scroll between stand column and timeline area
@@ -258,7 +305,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                 onDrop={(e) => handleStandDrop(e, stand)}
                 onClick={() => setEditingStand(stand)}
                 className={cn(
-                  "flex h-9 w-full items-center justify-center border-b border-border text-sm font-medium transition-all hover:bg-primary/10 hover:text-primary cursor-grab active:cursor-grabbing",
+                  "flex h-9 w-full items-center justify-center border-b border-border text-sm font-medium transition-all hover:bg-primary/10 hover:text-primary hover:cursor-pointer active:cursor-grabbing",
                   index % 2 === 0 ? "bg-card" : "bg-muted/30",
                   draggedStand === stand && "opacity-50 bg-primary/20 ring-2 ring-primary",
                   targetStand === stand && !conflictResult?.hasConflict && "bg-emerald-500/20",

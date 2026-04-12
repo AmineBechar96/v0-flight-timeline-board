@@ -58,7 +58,7 @@ export function FlightBlock({
   return (
     <div
       className={cn(
-        "group absolute top-1 bottom-1 cursor-grab active:cursor-grabbing",
+        "group absolute top-1 bottom-1 hover:cursor-pointer active:cursor-grabbing",
         isDragging && "opacity-50 scale-95",
         isConflicting && "ring-2 ring-red-500 ring-offset-1 ring-offset-background animate-pulse"
       )}

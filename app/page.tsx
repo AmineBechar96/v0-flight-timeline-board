@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { TimelineHeader } from "@/components/timeline-header"
-import { TimelineLegend } from "@/components/timeline-legend"
 import { TimelineGrid, type TimelineGridHandle } from "@/components/timeline-grid"
 import { FilterControls, type FilterState } from "@/components/filter-controls"
 import { ZoomControls } from "@/components/zoom-controls"
@@ -204,7 +203,6 @@ export default function StandAllocationBoard() {
         </div>
       </div>
 
-      <TimelineLegend airlines={airlinesData} />
       <TimelineGrid
         ref={gridRef}
         flights={flights}
