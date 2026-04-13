@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react"
 import {
-  Plane,
   Tag,
   X,
   Check,
   MapPin,
   Gauge,
   Layers,
-  ChevronDown,
 } from "lucide-react"
 import {
   Dialog,
@@ -19,15 +17,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
 import { useStandData } from "@/hooks/use-stand-data"
+import { FlightFiltersSection } from "@/components/flight-filters-section"
 
 interface StandEditModalProps {
   isOpen: boolean
@@ -50,14 +41,13 @@ export function StandEditModal({
   currentActive = true,
   onSave,
 }: StandEditModalProps) {
-  const { codes, airplanes, isLoading: isLoadingContext } = useStandData()
+  const { codes, isLoading: isLoadingContext } = useStandData()
   
   const [zoneId, setZoneId] = useState(currentZoneId)
   const [codeId, setCodeId] = useState(currentCodeId)
   const [active, setActive] = useState(currentActive)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedAirplaneIds, setSelectedAirplaneIds] = useState<string[]>([])
-  const [formErrors, setFormErrors] = useState<{ code?: string; airplanes?: string }>({})
+  const [formErrors, setFormErrors] = useState<{ code?: string }>({})
 
   // Reset form values when modal opens
   useEffect(() => {
@@ -66,39 +56,14 @@ export function StandEditModal({
       setCodeId(currentCodeId)
       setActive(currentActive)
       setFormErrors({})
-      
-      if (currentCodeId && currentAirplanes) {
-        setSelectedAirplaneIds(currentAirplanes.split(",").map(s => s.trim()).filter(Boolean))
-      } else {
-        setSelectedAirplaneIds([])
-      }
     }
-  }, [isOpen, currentZoneId, currentCodeId, currentAirplanes, currentActive])
-
-  // Reset selected airplanes when the code changes (unless it's matching the initial currentCodeId)
-  useEffect(() => {
-    if (isOpen) {
-      if (codeId === currentCodeId && currentAirplanes) {
-        setSelectedAirplaneIds(currentAirplanes.split(",").map(s => s.trim()).filter(Boolean))
-      } else if (codeId !== currentCodeId) {
-        // Clear selection when code changes (unless resetting to current)
-        setSelectedAirplaneIds([])
-      }
-    }
-  }, [codeId, isOpen, currentCodeId, currentAirplanes])
-
-  // Compute filtered airplanes based on the selected code
-  const airplaneList = airplanes.filter(a => !codeId || a.code_id === codeId)
+  }, [isOpen, currentZoneId, currentCodeId, currentActive])
 
   const validateForm = () => {
-    const errors: { code?: string; airplanes?: string } = {}
+    const errors: { code?: string } = {}
     
     if (!codeId.trim()) {
       errors.code = "Please select a code"
-    }
-    
-    if (selectedAirplaneIds.length === 0) {
-      errors.airplanes = "Please select at least one aircraft"
     }
     
     setFormErrors(errors)
@@ -118,7 +83,7 @@ export function StandEditModal({
     onSave({
       zoneId: zoneId.trim(),
       codeId: codeId.trim(),
-      airplanes: selectedAirplaneIds.join(", "),
+      airplanes: currentAirplanes || "",
       active,
     })
     
@@ -133,21 +98,6 @@ export function StandEditModal({
     setFormErrors({})
     onClose()
   }
-
-  const getCodeName = (id: string) => codes.find(c => c.id === id)?.name || id
-
-  const toggleAirplane = (registration: string) => {
-    setSelectedAirplaneIds(prev => 
-      prev.includes(registration) ? prev.filter(a => a !== registration) : [...prev, registration]
-    )
-    setFormErrors(prev => ({ ...prev, airplanes: undefined }))
-  }
-
-  const airplaneDisplayText = selectedAirplaneIds.length === 0 
-    ? "Select aircrafts..."
-    : selectedAirplaneIds.length === 1 
-      ? selectedAirplaneIds[0]
-      : `${selectedAirplaneIds.length} aircrafts selected`
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -252,62 +202,8 @@ export function StandEditModal({
               )}
             </div>
 
-            {/* Aircrafts Field */}
-            <div className="group relative">
-              <label className="flex items-center gap-2 text-sm font-medium text-foreground/80 mb-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary/10">
-                  <Plane className="h-3 w-3 text-primary" />
-                </span>
-                Aircrafts
-              </label>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`w-full justify-between h-12 px-4 text-left font-normal hover:cursor-pointer ${
-                      formErrors.airplanes ? "border-destructive" : ""
-                    }`}
-                    disabled={isSubmitting || isLoadingContext || !codeId || airplaneList.length === 0}
-                  >
-                    <span className="flex items-center gap-2 truncate">
-                      <Plane className="h-4 w-4 text-muted-foreground" />
-                      {isLoadingContext 
-                        ? "Loading aircrafts..." 
-                        : !codeId 
-                          ? "Select a code first" 
-                          : airplaneList.length === 0 
-                            ? "No aircrafts available for this code" 
-                            : airplaneDisplayText}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </Button>
-                </DropdownMenuTrigger>
-                {codeId && airplaneList.length > 0 && !isLoadingContext && (
-                  <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-64 overflow-y-auto">
-                    <DropdownMenuLabel className="text-xs">Available Aircrafts</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {airplaneList.map((airplane) => (
-                      <DropdownMenuCheckboxItem
-                        key={airplane.id}
-                        checked={selectedAirplaneIds.includes(airplane.registration)}
-                        onCheckedChange={() => toggleAirplane(airplane.registration)}
-                      >
-                        <span className="mr-2 font-mono text-xs text-muted-foreground">{airplane.registration}</span>
-                        {airplane.aircraft_type}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                )}
-              </DropdownMenu>
-              
-              {formErrors.airplanes && (
-                <p className="mt-1.5 text-xs text-destructive flex items-center gap-1 animate-in slide-in-from-top-1">
-                  <span className="inline-block w-1 h-1 rounded-full bg-destructive" />
-                  {formErrors.airplanes}
-                </p>
-              )}
-            </div>
+            {/* Flight Filters Section */}
+            <FlightFiltersSection standId={standId || ""} codeId={codeId} />
 
             {/* Active Toggle */}
             <div className="relative">

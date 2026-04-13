@@ -81,3 +81,12 @@ export const statusColors: Record<FlightStatus, string> = {
   completed: "opacity-60",
   cancelled: "opacity-40 line-through",
 }
+
+export type StandCodeFilterOperation = "add" | "remove"
+
+export interface StandCodeFilter {
+  id?: number
+  stand_id: string
+  operation: StandCodeFilterOperation
+  aircraft_type: string
+}

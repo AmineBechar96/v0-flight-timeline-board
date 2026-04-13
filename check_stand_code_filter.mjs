@@ -5,7 +5,16 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function check() {
-  const { data: filter, error: err1 } = await supabase.from('stand_code_filter').select('*').limit(5);
-  console.log('stand_code_filter:', filter, err1);
+  // Test insert a remove filter
+  const { data, error } = await supabase.from('stand_code_filter').insert({
+    stand_id: '4',
+    operation: 'remove',
+    flight_num: 'G9501'
+  }).select()
+  console.log('Insert result:', data, error);
+  
+  // Fetch filters for stand 4
+  const { data: filters, error: err } = await supabase.from('stand_code_filter').select('*').eq('stand_id', '4');
+  console.log('Filters for stand 4:', filters, err);
 }
 check();
