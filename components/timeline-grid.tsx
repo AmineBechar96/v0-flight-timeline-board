@@ -30,6 +30,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
   function TimelineGrid({ flights, maintenanceZones, zoom, stands, onFlightSelect, onFlightReassign }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const standScrollRef = useRef<HTMLDivElement>(null)
+    const [mounted, setMounted] = useState(false)
     const [currentTimePosition, setCurrentTimePosition] = useState(0)
     const [draggedFlight, setDraggedFlight] = useState<Flight | null>(null)
     const [targetStand, setTargetStand] = useState<string | null>(null)
@@ -55,6 +56,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
 
     // Calculate current time position
     useEffect(() => {
+      setMounted(true)
       const updateTimePosition = () => {
         const now = new Date()
         const hours = now.getHours() + now.getMinutes() / 60
@@ -69,10 +71,10 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
 
     // Scroll to current time on mount
     useEffect(() => {
-      if (scrollRef.current && currentTimePosition > 0) {
+      if (scrollRef.current && mounted && currentTimePosition > 0) {
         scrollRef.current.scrollLeft = Math.max(0, currentTimePosition - 300)
       }
-    }, []) // Only on mount
+    }, [mounted, currentTimePosition]) // Only on mount
 
     // Sort stands: 1,2,3,4,5,6,7,8,9,1A,1B,1C,10,11,12...
     // Pattern: 1-9 no suffix, 1-9 with suffix, 10+ no suffix, 10+ with suffix
@@ -317,7 +319,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
         </div>
 
         {/* Scrollable timeline area */}
-        <div ref={scrollRef} className="flex-1 overflow-auto">
+        <div ref={scrollRef} className="flex-1 overflow-auto overflow-x-visible" style={{ overflowX: "auto", overflowY: "auto" }}>
           <div style={{ width: `${24 * hourWidth}px`, minWidth: "100%" }}>
             {/* Time header */}
             <div className="sticky top-0 z-20 flex h-10 border-b border-border bg-muted/50">
@@ -353,8 +355,8 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                 ))}
               </div>
 
-              {/* Current time indicator */}
-              {currentTimePosition > 0 && currentTimePosition < 24 * hourWidth && (
+              {/* Current time indicator - only show after mounting to avoid hydration mismatch */}
+              {mounted && currentTimePosition > 0 && currentTimePosition < 24 * hourWidth && (
                 <div
                   className="pointer-events-none absolute top-0 bottom-0 z-30 w-0.5 bg-primary"
                   style={{ left: `${currentTimePosition}px` }}

@@ -1,5 +1,6 @@
 export type FlightType = "arrival" | "departure" | "turnaround"
 export type FlightStatus = "scheduled" | "boarding" | "delayed" | "completed" | "cancelled"
+export type ConnectionType = "quick" | "no_connection" | "critical" | "priority"
 
 export interface Flight {
   id: string
@@ -15,6 +16,7 @@ export interface Flight {
   duration: number // in hours
   type: FlightType
   status: FlightStatus
+  connectionType: ConnectionType | null
   passengers?: number
   gate?: string
   delayMinutes?: number

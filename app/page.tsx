@@ -7,6 +7,8 @@ import { FilterControls, type FilterState } from "@/components/filter-controls"
 import { ZoomControls } from "@/components/zoom-controls"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { FlightDetailPanel } from "@/components/flight-detail-panel"
+import { CodesManagementModal } from "@/components/codes-management-modal"
+import { StandDataProvider } from "@/hooks/use-stand-data"
 import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
 import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
@@ -17,10 +19,12 @@ export default function StandAllocationBoard() {
   const [zoom, setZoom] = useState(1)
   const [showHelp, setShowHelp] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
+  const [showCodesModal, setShowCodesModal] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     airlines: [],
-    connectionTypes: [],
+    flightTypes: [],
+    dbConnectionTypes: [],
     statuses: [],
   })
   const gridRef = useRef<TimelineGridHandle>(null)
@@ -73,8 +77,12 @@ export default function StandAllocationBoard() {
         if (!filters.airlines.includes(flight.airlineCode)) return false
       }
 
-      if (filters.connectionTypes.length > 0) {
-        if (!filters.connectionTypes.includes(flight.type)) return false
+      if (filters.flightTypes.length > 0) {
+        if (!filters.flightTypes.includes(flight.type)) return false
+      }
+
+      if (filters.dbConnectionTypes.length > 0) {
+        if (!flight.connectionType || !filters.dbConnectionTypes.includes(flight.connectionType)) return false
       }
 
       if (filters.statuses.length > 0) {
@@ -133,7 +141,8 @@ export default function StandAllocationBoard() {
     setFilters({
       search: "",
       airlines: [],
-      connectionTypes: [],
+      flightTypes: [],
+      dbConnectionTypes: [],
       statuses: [],
     })
   }, [])
@@ -181,52 +190,55 @@ export default function StandAllocationBoard() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <TimelineHeader
-        totalFlights={flights.length}
-        activeFlights={activeFlights}
-        maintenanceZones={maintenanceZones.length}
-        onRefresh={handleRefresh}
-      />
+    <StandDataProvider>
+      <div className="flex h-screen flex-col bg-background">
+        <TimelineHeader
+          totalFlights={flights.length}
+          activeFlights={activeFlights}
+          maintenanceZones={maintenanceZones.length}
+          onRefresh={handleRefresh}
+        />
 
-      <div className="flex items-center justify-between border-b border-border bg-card px-6 py-2">
-        <FilterControls filters={filters} onFiltersChange={setFilters} airlines={airlinesData} />
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowHelp(true)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">?</span>
-            Shortcuts
-          </button>
-          <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+        <div className="flex items-center justify-between border-b border-border bg-card px-6 py-2">
+          <FilterControls filters={filters} onFiltersChange={setFilters} airlines={airlinesData} onOpenCodesManagement={() => setShowCodesModal(true)} />
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowHelp(true)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">?</span>
+              Shortcuts
+            </button>
+            <ZoomControls zoom={zoom} onZoomChange={setZoom} />
+          </div>
         </div>
+
+        <TimelineGrid
+          ref={gridRef}
+          flights={flights}
+          maintenanceZones={maintenanceZones}
+          zoom={zoom}
+          stands={standsData}
+          onFlightSelect={handleFlightSelect}
+          onFlightReassign={handleFlightReassign}
+        />
+
+        <KeyboardShortcuts
+          isOpen={showHelp}
+          onClose={() => setShowHelp(false)}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          onRefresh={handleRefresh}
+          onToggleHelp={() => setShowHelp((prev) => !prev)}
+          onFocusSearch={handleFocusSearch}
+          onScrollToNow={handleScrollToNow}
+          onClearFilters={handleClearFilters}
+        />
+
+        <FlightDetailPanel flight={selectedFlight} onClose={handleClosePanel} />
+        <CodesManagementModal isOpen={showCodesModal} onClose={() => setShowCodesModal(false)} />
       </div>
-
-      <TimelineGrid
-        ref={gridRef}
-        flights={flights}
-        maintenanceZones={maintenanceZones}
-        zoom={zoom}
-        stands={standsData}
-        onFlightSelect={handleFlightSelect}
-        onFlightReassign={handleFlightReassign}
-      />
-
-      <KeyboardShortcuts
-        isOpen={showHelp}
-        onClose={() => setShowHelp(false)}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onRefresh={handleRefresh}
-        onToggleHelp={() => setShowHelp((prev) => !prev)}
-        onFocusSearch={handleFocusSearch}
-        onScrollToNow={handleScrollToNow}
-        onClearFilters={handleClearFilters}
-      />
-
-      <FlightDetailPanel flight={selectedFlight} onClose={handleClosePanel} />
-    </div>
+    </StandDataProvider>
   )
 }

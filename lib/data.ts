@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Flight, FlightType, Stand, Airline } from "./types"
+import type { Flight, FlightType, Stand, Airline, ConnectionType } from "./types"
 
 /**
  * Fetch all stands from Supabase, ordered by id.
@@ -155,7 +155,8 @@ export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<F
         origin,
         destination,
         pax_in,
-        pax_out
+        pax_out,
+        connection_type
       )
     `)
 
@@ -180,6 +181,19 @@ export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<F
       const airlineCode = (f.airline as string) ?? ""
       const origin = f.origin as string | null
       const destination = f.destination as string | null
+      const dbConnectionType = f.connection_type as string | null
+
+      // Map database connection_type to our ConnectionType (handle null/empty)
+      let connectionType: ConnectionType | null = null
+      if (dbConnectionType) {
+        const normalizedType = dbConnectionType.toLowerCase()
+        if (normalizedType === "quick" || normalizedType === "no_connection" || normalizedType === "critical" || normalizedType === "priority") {
+          connectionType = normalizedType as ConnectionType
+        } else if (normalizedType === "normal") {
+          // Map 'normal' to 'quick' for UI consistency
+          connectionType = "quick"
+        }
+      }
 
       return {
         id: alloc.flight_num,
@@ -195,6 +209,7 @@ export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<F
         duration: computeDuration(alloc.arr_time!, alloc.dep_time!),
         type: deriveFlightType(origin, destination),
         status: "scheduled" as const,
+        connectionType,
         passengers: ((f.pax_in as number) ?? 0) + ((f.pax_out as number) ?? 0) || undefined,
       }
     })

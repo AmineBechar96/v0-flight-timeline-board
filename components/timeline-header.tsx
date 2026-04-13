@@ -12,10 +12,12 @@ interface TimelineHeaderProps {
 }
 
 export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh }: TimelineHeaderProps) {
-  const [formattedDate, setFormattedDate] = useState("")
-  const [formattedTime, setFormattedTime] = useState("")
+  const [mounted, setMounted] = useState(false)
+  const [formattedDate, setFormattedDate] = useState("---")
+  const [formattedTime, setFormattedTime] = useState("--:--")
 
   useEffect(() => {
+    setMounted(true)
     const updateTime = () => {
       const currentTime = new Date()
       setFormattedDate(
@@ -56,11 +58,11 @@ export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, 
           <div className="ml-8 flex items-center gap-6 border-l border-border pl-8">
             <div className="flex items-center gap-2 text-sm">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground">{formattedDate || "---"}</span>
+              <span className="font-medium text-foreground">{formattedDate}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="font-mono text-foreground">{formattedTime || "--:--"}</span>
+              <span className="font-mono text-foreground">{formattedTime}</span>
             </div>
           </div>
         </div>

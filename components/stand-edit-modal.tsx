@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { fetchCodes, fetchAirplanes } from "@/lib/data"
+import { useStandData } from "@/hooks/use-stand-data"
 
 interface StandEditModalProps {
   isOpen: boolean
@@ -50,17 +50,16 @@ export function StandEditModal({
   currentActive = true,
   onSave,
 }: StandEditModalProps) {
+  const { codes, airplanes, isLoading: isLoadingContext } = useStandData()
+  
   const [zoneId, setZoneId] = useState(currentZoneId)
   const [codeId, setCodeId] = useState(currentCodeId)
   const [active, setActive] = useState(currentActive)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoadingData, setIsLoadingData] = useState(false)
-  const [codes, setCodes] = useState<{ id: string; name: string }[]>([])
-  const [allAirplanes, setAllAirplanes] = useState<{ id: string; registration: string; aircraft_type: string; code_id?: string }[]>([])
   const [selectedAirplaneIds, setSelectedAirplaneIds] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<{ code?: string; airplanes?: string }>({})
 
-  // Fetch zones, codes, and all airplanes when modal opens
+  // Reset form values when modal opens
   useEffect(() => {
     if (isOpen) {
       setZoneId(currentZoneId)
@@ -68,25 +67,11 @@ export function StandEditModal({
       setActive(currentActive)
       setFormErrors({})
       
-      // Load all reference data in parallel
-      setIsLoadingData(true)
-      Promise.all([fetchCodes(), fetchAirplanes()])
-        .then(([codesData, airplanesData]) => {
-          setCodes(codesData)
-          setAllAirplanes(airplanesData)
-          
-          if (currentCodeId && currentAirplanes) {
-            setSelectedAirplaneIds(currentAirplanes.split(",").map(s => s.trim()).filter(Boolean))
-          } else {
-            setSelectedAirplaneIds([])
-          }
-        })
-        .catch(() => {
-          setCodes([])
-          setAllAirplanes([])
-          setSelectedAirplaneIds([])
-        })
-        .finally(() => setIsLoadingData(false))
+      if (currentCodeId && currentAirplanes) {
+        setSelectedAirplaneIds(currentAirplanes.split(",").map(s => s.trim()).filter(Boolean))
+      } else {
+        setSelectedAirplaneIds([])
+      }
     }
   }, [isOpen, currentZoneId, currentCodeId, currentAirplanes, currentActive])
 
@@ -95,14 +80,15 @@ export function StandEditModal({
     if (isOpen) {
       if (codeId === currentCodeId && currentAirplanes) {
         setSelectedAirplaneIds(currentAirplanes.split(",").map(s => s.trim()).filter(Boolean))
-      } else {
+      } else if (codeId !== currentCodeId) {
+        // Clear selection when code changes (unless resetting to current)
         setSelectedAirplaneIds([])
       }
     }
   }, [codeId, isOpen, currentCodeId, currentAirplanes])
 
   // Compute filtered airplanes based on the selected code
-  const airplaneList = allAirplanes.filter(a => !codeId || a.code_id === codeId)
+  const airplaneList = airplanes.filter(a => !codeId || a.code_id === codeId)
 
   const validateForm = () => {
     const errors: { code?: string; airplanes?: string } = {}
@@ -199,13 +185,20 @@ export function StandEditModal({
                 </span>
                 Zone
               </label>
-              <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Layers className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">{zoneId || "—"}</span>
-                </div>
+              <div className="flex justify-center">
+                <span
+                  className={`inline-flex items-center justify-center h-10 min-w-[60px] rounded-lg px-4 text-sm font-medium transition-all duration-200 ${
+                    zoneId === "PBB"
+                      ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30"
+                      : zoneId === "Remote"
+                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                      : zoneId === "Cargo"
+                      ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                      : "bg-muted text-muted-foreground border border-input"
+                  }`}
+                >
+                  {zoneId || "—"}
+                </span>
               </div>
             </div>
 
@@ -218,7 +211,7 @@ export function StandEditModal({
                 Code Stand
               </label>
               
-              {isLoadingData ? (
+              {isLoadingContext ? (
                 <div className="flex items-center justify-center h-12 rounded-md border border-input bg-muted/30">
                   <span className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                   <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
@@ -234,7 +227,7 @@ export function StandEditModal({
                         setFormErrors(prev => ({ ...prev, code: undefined }))
                       }}
                       disabled={isSubmitting}
-                      className={`relative h-10 rounded-lg border text-sm font-medium transition-all duration-200 ${
+                      className={`relative h-10 rounded-lg border text-sm font-medium transition-all duration-200 hover:cursor-pointer ${
                         codeId === c.id
                           ? "bg-primary/20 border-primary text-primary shadow-md"
                           : "bg-card border-input hover:border-primary/50 hover:bg-primary/5"
@@ -272,14 +265,14 @@ export function StandEditModal({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className={`w-full justify-between h-12 px-4 text-left font-normal ${
+                    className={`w-full justify-between h-12 px-4 text-left font-normal hover:cursor-pointer ${
                       formErrors.airplanes ? "border-destructive" : ""
                     }`}
-                    disabled={isSubmitting || isLoadingData || !codeId || airplaneList.length === 0}
+                    disabled={isSubmitting || isLoadingContext || !codeId || airplaneList.length === 0}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <Plane className="h-4 w-4 text-muted-foreground" />
-                      {isLoadingData 
+                      {isLoadingContext 
                         ? "Loading aircrafts..." 
                         : !codeId 
                           ? "Select a code first" 
@@ -290,7 +283,7 @@ export function StandEditModal({
                     <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                {codeId && airplaneList.length > 0 && !isLoadingData && (
+                {codeId && airplaneList.length > 0 && !isLoadingContext && (
                   <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-64 overflow-y-auto">
                     <DropdownMenuLabel className="text-xs">Available Aircrafts</DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -340,7 +333,7 @@ export function StandEditModal({
                   type="button"
                   onClick={() => setActive(!active)}
                   disabled={isSubmitting}
-                  className={`relative h-8 w-16 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${
+                  className={`relative h-8 w-16 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 hover:cursor-pointer ${
                     active 
                       ? "bg-emerald-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
                       : "bg-muted"
@@ -375,7 +368,7 @@ export function StandEditModal({
               variant="outline"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="flex-1 h-11 transition-all duration-200 hover:bg-destructive/10"
+              className="flex-1 h-11 transition-all duration-200 hover:bg-destructive/10 hover:cursor-pointer"
             >
               <X className="h-4 w-4 mr-2" />
               Cancel
@@ -383,7 +376,7 @@ export function StandEditModal({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className={`flex-1 h-11 transition-all duration-300 ${
+              className={`flex-1 h-11 transition-all duration-300 hover:cursor-pointer ${
                 isSubmitting 
                   ? "bg-primary/80" 
                   : "bg-gradient-to-r from-primary to-primary/90 hover:shadow-lg hover:shadow-primary/25"

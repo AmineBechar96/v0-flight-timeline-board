@@ -67,7 +67,7 @@ export function FlightDetailPanel({ flight, onClose }: FlightDetailPanelProps) {
               <h2 className="font-mono text-2xl font-bold text-foreground">{flight.flightNumber}</h2>
               <p className="text-sm text-muted-foreground">{flight.airline}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 hover:cursor-pointer">
               <X className="h-5 w-5" />
             </Button>
           </div>

@@ -12,12 +12,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import type { FlightType, FlightStatus, Airline } from "@/lib/types"
+import type { FlightType, FlightStatus, Airline, ConnectionType } from "@/lib/types"
 
-const connectionTypes: { value: FlightType; label: string }[] = [
+const flightTypes: { value: FlightType; label: string }[] = [
   { value: "arrival", label: "Arrivals" },
   { value: "departure", label: "Departures" },
   { value: "turnaround", label: "Turnarounds" },
+]
+
+const dbConnectionTypes: { value: ConnectionType; label: string; color: string }[] = [
+  { value: "quick", label: "Quick", color: "bg-emerald-500" },
+  { value: "no_connection", label: "No Conn", color: "bg-slate-500" },
+  { value: "critical", label: "Critical", color: "bg-red-500" },
+  { value: "priority", label: "Priority", color: "bg-amber-500" },
 ]
 
 const statusOptions: { value: FlightStatus; label: string }[] = [
@@ -31,7 +38,8 @@ const statusOptions: { value: FlightStatus; label: string }[] = [
 export interface FilterState {
   search: string
   airlines: string[]
-  connectionTypes: FlightType[]
+  flightTypes: FlightType[]
+  dbConnectionTypes: ConnectionType[]
   statuses: FlightStatus[]
 }
 
@@ -39,14 +47,16 @@ interface FilterControlsProps {
   filters: FilterState
   onFiltersChange: (filters: FilterState) => void
   airlines?: Airline[]
+  onOpenCodesManagement?: () => void
 }
 
-export function FilterControls({ filters, onFiltersChange, airlines = [] }: FilterControlsProps) {
+export function FilterControls({ filters, onFiltersChange, airlines = [], onOpenCodesManagement }: FilterControlsProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const activeFilterCount =
     filters.airlines.length +
-    filters.connectionTypes.length +
+    filters.flightTypes.length +
+    filters.dbConnectionTypes.length +
     filters.statuses.length +
     (filters.search ? 1 : 0)
 
@@ -61,11 +71,18 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
     onFiltersChange({ ...filters, airlines: newAirlines })
   }
 
-  const toggleConnectionType = (type: FlightType) => {
-    const newTypes = filters.connectionTypes.includes(type)
-      ? filters.connectionTypes.filter((t) => t !== type)
-      : [...filters.connectionTypes, type]
-    onFiltersChange({ ...filters, connectionTypes: newTypes })
+  const toggleFlightType = (type: FlightType) => {
+    const newTypes = filters.flightTypes.includes(type)
+      ? filters.flightTypes.filter((t) => t !== type)
+      : [...filters.flightTypes, type]
+    onFiltersChange({ ...filters, flightTypes: newTypes })
+  }
+
+  const toggleDbConnectionType = (type: ConnectionType) => {
+    const newTypes = filters.dbConnectionTypes.includes(type)
+      ? filters.dbConnectionTypes.filter((t) => t !== type)
+      : [...filters.dbConnectionTypes, type]
+    onFiltersChange({ ...filters, dbConnectionTypes: newTypes })
   }
 
   const toggleStatus = (status: FlightStatus) => {
@@ -79,7 +96,8 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
     onFiltersChange({
       search: "",
       airlines: [],
-      connectionTypes: [],
+      flightTypes: [],
+      dbConnectionTypes: [],
       statuses: [],
     })
   }
@@ -106,14 +124,43 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
         )}
       </div>
 
-      {/* Connection Type Filter */}
+      {/* Connection Type Filter (DB Connection Types) */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-1.5 hover:cursor-pointer">
             Connection
-            {filters.connectionTypes.length > 0 && (
+            {filters.dbConnectionTypes.length > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                {filters.connectionTypes.length}
+                {filters.dbConnectionTypes.length}
+              </span>
+            )}
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuLabel className="text-xs">Connection Type</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {dbConnectionTypes.map((type) => (
+            <DropdownMenuCheckboxItem
+              key={type.value}
+              checked={filters.dbConnectionTypes.includes(type.value)}
+              onCheckedChange={() => toggleDbConnectionType(type.value)}
+            >
+              <span className={`mr-2 h-2 w-2 rounded-full ${type.color}`} />
+              {type.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Flight Type Filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 hover:cursor-pointer">
+            Flight Type
+            {filters.flightTypes.length > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                {filters.flightTypes.length}
               </span>
             )}
             <ChevronDown className="h-3.5 w-3.5" />
@@ -122,11 +169,11 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
         <DropdownMenuContent align="start" className="w-40">
           <DropdownMenuLabel className="text-xs">Flight Type</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {connectionTypes.map((type) => (
+          {flightTypes.map((type) => (
             <DropdownMenuCheckboxItem
               key={type.value}
-              checked={filters.connectionTypes.includes(type.value)}
-              onCheckedChange={() => toggleConnectionType(type.value)}
+              checked={filters.flightTypes.includes(type.value)}
+              onCheckedChange={() => toggleFlightType(type.value)}
             >
               {type.label}
             </DropdownMenuCheckboxItem>
@@ -201,6 +248,19 @@ export function FilterControls({ filters, onFiltersChange, airlines = [] }: Filt
         >
           <X className="h-3.5 w-3.5" />
           Clear ({activeFilterCount})
+        </Button>
+      )}
+
+      {/* Codes Management Button */}
+      {onOpenCodesManagement && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenCodesManagement}
+          className="h-8 gap-1.5 hover:cursor-pointer"
+        >
+          Codes
+          <ChevronDown className="h-3.5 w-3.5" />
         </Button>
       )}
     </div>
