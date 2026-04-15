@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Plane, Clock, CalendarDays, Filter, RefreshCw, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DatePickerCalendar } from "@/components/date-picker-calendar"
+import { AllocationModeSwitcher, AllocationMode } from "@/components/allocation-mode-switcher"
 
 interface TimelineHeaderProps {
   totalFlights: number
@@ -15,9 +16,11 @@ interface TimelineHeaderProps {
   onNextDay?: () => void
   onToday?: () => void
   onDateChange?: (date: string) => void
+  allocationMode?: AllocationMode
+  onAllocationModeChange?: (mode: AllocationMode) => void
 }
 
-export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh, selectedDate, onPreviousDay, onNextDay, onToday, onDateChange }: TimelineHeaderProps) {
+export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh, selectedDate, onPreviousDay, onNextDay, onToday, onDateChange, allocationMode = "manual", onAllocationModeChange }: TimelineHeaderProps) {
   const [mounted, setMounted] = useState(false)
   const [formattedDate, setFormattedDate] = useState("---")
   const [formattedTime, setFormattedTime] = useState("--:--")
@@ -161,6 +164,14 @@ export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, 
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="font-mono text-foreground">{mounted ? formattedTime : "--:--"}</span>
+            </div>
+
+            {/* Allocation Mode Switcher */}
+            <div className="ml-4">
+              <AllocationModeSwitcher
+                mode={allocationMode}
+                onModeChange={onAllocationModeChange || (() => {})}
+              />
             </div>
           </div>
         </div>

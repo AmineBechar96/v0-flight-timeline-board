@@ -12,6 +12,7 @@ import { StandDataProvider } from "@/hooks/use-stand-data"
 import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
 import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
+import type { AllocationMode } from "@/components/allocation-mode-switcher"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3]
 
@@ -39,6 +40,9 @@ export default function StandAllocationBoard() {
     // Default to today's date in YYYY-MM-DD format
     return new Date().toISOString().split("T")[0]
   })
+
+  // Allocation mode state
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>("manual")
 
   // No maintenance zones in the DB — empty array
   const maintenanceZones: MaintenanceZone[] = []
@@ -229,6 +233,8 @@ export default function StandAllocationBoard() {
           onNextDay={handleNextDay}
           onToday={handleToday}
           onDateChange={setSelectedDate}
+          allocationMode={allocationMode}
+          onAllocationModeChange={setAllocationMode}
         />
 
         <div className="flex items-center justify-between border-b border-border bg-card px-6 py-2">
