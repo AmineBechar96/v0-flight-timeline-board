@@ -12,6 +12,7 @@ import { StandDataProvider } from "@/hooks/use-stand-data"
 import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
 import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
+import { loadCsvFlights } from "@/lib/csv-data"
 import type { AllocationMode } from "@/components/allocation-mode-switcher"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3]
@@ -37,11 +38,11 @@ export default function StandAllocationBoard() {
 
   // Date state for filtering flights by day
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    // Default to today's date in YYYY-MM-DD format
-    return new Date().toISOString().split("T")[0]
+    // Default to July 1st, 2025 for CSV demo (we have data for this date)
+    return "2025-07-01"
   })
 
-  // Allocation mode state
+  // Allocation mode state - default to manual mode (loads CSV files)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>("manual")
 
   // No maintenance zones in the DB — empty array
@@ -68,19 +69,41 @@ export default function StandAllocationBoard() {
     setSelectedDate(new Date().toISOString().split("T")[0])
   }, [])
 
-  // Fetch data from Supabase
+  // CSV error state for showing messages
+  const [csvError, setCsvError] = useState<string | null>(null)
+
+  // Fetch data from Supabase or CSV
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [stands, airlines, flights] = await Promise.all([
+    setCsvError(null) // Clear previous errors
+    
+    // Always fetch stands and airlines from Supabase
+    const [stands, airlines] = await Promise.all([
       fetchStands(),
       fetchAirlines(),
-      fetchFlights(undefined, selectedDate),
     ])
     setStandsData(stands)
     setAirlinesData(airlines)
-    setFlightsData(flights)
+    
+    // Fetch flights based on mode
+    if (allocationMode === "manual") {
+      // Load flights from CSV file for the selected date
+      const result = await loadCsvFlights(selectedDate)
+      if (result.success) {
+        setFlightsData(result.flights)
+      } else {
+        // Show error but keep empty flights
+        setFlightsData([])
+        setCsvError(result.error || "Failed to load CSV file")
+      }
+    } else {
+      // Load flights from Supabase (optimized mode)
+      const flights = await fetchFlights(undefined, selectedDate)
+      setFlightsData(flights)
+    }
+    
     setLoading(false)
-  }, [selectedDate])
+  }, [selectedDate, allocationMode])
 
   useEffect(() => {
     loadData()
@@ -223,6 +246,26 @@ export default function StandAllocationBoard() {
   return (
     <StandDataProvider>
       <div className="flex h-screen flex-col bg-background">
+        {/* CSV Error Banner */}
+        {csvError && (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700 text-sm">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>{csvError}</span>
+            </div>
+            <button
+              onClick={() => setCsvError(null)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         <TimelineHeader
           totalFlights={flights.length}
           activeFlights={activeFlights}

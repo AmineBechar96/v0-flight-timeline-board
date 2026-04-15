@@ -23,9 +23,10 @@ export function AllocationModeSwitcher({
         className={cn(
           "px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 hover:cursor-pointer",
           isManual
-            ? "bg-red-600 text-white shadow-sm"
+            ? "bg-blue-600 text-white shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
+        title="Load from CSV files (non-optimized)"
       >
         Manual
       </button>
