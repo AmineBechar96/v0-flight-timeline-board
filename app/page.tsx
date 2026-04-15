@@ -12,7 +12,7 @@ import { StandDataProvider } from "@/hooks/use-stand-data"
 import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
 import { fetchFlights, fetchStands, fetchAirlines, reassignFlightStand } from "@/lib/data"
-import { loadCsvFlights } from "@/lib/csv-data"
+import { loadCsvFlights, loadOptimizedCsvFlights } from "@/lib/csv-data"
 import type { AllocationMode } from "@/components/allocation-mode-switcher"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3]
@@ -87,7 +87,7 @@ export default function StandAllocationBoard() {
     
     // Fetch flights based on mode
     if (allocationMode === "manual") {
-      // Load flights from CSV file for the selected date
+      // Load flights from Manual CSV file (daily files: allocation_M1_YYYYMMDD.csv)
       const result = await loadCsvFlights(selectedDate)
       if (result.success) {
         setFlightsData(result.flights)
@@ -96,10 +96,16 @@ export default function StandAllocationBoard() {
         setFlightsData([])
         setCsvError(result.error || "Failed to load CSV file")
       }
-    } else {
-      // Load flights from Supabase (optimized mode)
-      const flights = await fetchFlights(undefined, selectedDate)
-      setFlightsData(flights)
+    } else if (allocationMode === "optimized") {
+      // Load flights from Optimized CSV file (monthly file: Ops_july_cleaned_v5.csv)
+      const result = await loadOptimizedCsvFlights(selectedDate)
+      if (result.success) {
+        setFlightsData(result.flights)
+      } else {
+        // Show error but keep empty flights
+        setFlightsData([])
+        setCsvError(result.error || "Failed to load optimized CSV file")
+      }
     }
     
     setLoading(false)
