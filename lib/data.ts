@@ -149,9 +149,17 @@ function deriveFlightType(origin?: string | null, destination?: string | null): 
 /**
  * Convert a timestamp to hours from midnight (0-24).
  */
-function timestampToHours(timestamp: string): number {
+export function timestampToHours(timestamp: string): number {
   const date = new Date(timestamp)
   return date.getHours() + date.getMinutes() / 60
+}
+
+/**
+ * Extract the date part (YYYY-MM-DD) from a timestamp string.
+ */
+export function extractDateFromTimestamp(timestamp: string): string {
+  const date = new Date(timestamp)
+  return date.toISOString().split("T")[0]
 }
 
 /**
@@ -165,8 +173,10 @@ function computeDuration(arrTime: string, depTime: string): number {
 
 /**
  * Fetch flights joined with allocations and airlines.
+ * @param airlinesMap - Optional map of airline codes to names
+ * @param date - Optional date string (YYYY-MM-DD) to filter flights for a specific day
  */
-export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<Flight[]> {
+export async function fetchFlights(airlinesMap?: Map<string, string>, date?: string): Promise<Flight[]> {
   const { data: allocations, error: allocError } = await supabase
     .from("allocations")
     .select(`
@@ -200,11 +210,19 @@ export async function fetchFlights(airlinesMap?: Map<string, string>): Promise<F
     airlineNameMap = new Map(airlines.map((a) => [a.iataCode, a.fullName]))
   }
 
-  return allocations
-    .filter((alloc) => {
-      const f = alloc.flights as unknown as Record<string, unknown>
-      return f && f.arr_time && f.dep_time
-    })
+  // Apply date filter if provided
+  const filteredAllocations = allocations.filter((alloc) => {
+    const f = alloc.flights as unknown as Record<string, unknown>
+    if (!f || !f.arr_time || !f.dep_time) return false
+    
+    if (date) {
+      const flightDate = extractDateFromTimestamp(f.arr_time as string)
+      return flightDate === date
+    }
+    return true
+  })
+
+  return filteredAllocations
     .map((alloc) => {
       const f = alloc.flights as unknown as Record<string, unknown>
       const airlineCode = (f.airline as string) ?? ""

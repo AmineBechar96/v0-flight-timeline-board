@@ -1,20 +1,71 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plane, Clock, CalendarDays, Filter, RefreshCw } from "lucide-react"
+import { Plane, Clock, CalendarDays, Filter, RefreshCw, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { DatePickerCalendar } from "@/components/date-picker-calendar"
 
 interface TimelineHeaderProps {
   totalFlights: number
   activeFlights: number
   maintenanceZones: number
   onRefresh: () => void
+  selectedDate?: string
+  onPreviousDay?: () => void
+  onNextDay?: () => void
+  onToday?: () => void
+  onDateChange?: (date: string) => void
 }
 
-export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh }: TimelineHeaderProps) {
+export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, onRefresh, selectedDate, onPreviousDay, onNextDay, onToday, onDateChange }: TimelineHeaderProps) {
   const [mounted, setMounted] = useState(false)
   const [formattedDate, setFormattedDate] = useState("---")
   const [formattedTime, setFormattedTime] = useState("--:--")
+  const [showCalendar, setShowCalendar] = useState(false)
+
+  // Handle date input click
+  const handleDateClick = () => {
+    setShowCalendar(true)
+  }
+
+  // Handle date change from picker
+  const handleDateChange = (date: string) => {
+    if (onDateChange) {
+      onDateChange(date)
+    }
+  }
+
+  // Format the selected date for display with month, day, and year
+  const formatSelectedDate = (dateStr: string) => {
+    if (!dateStr) return "---"
+    const date = new Date(dateStr + "T00:00:00")
+    
+    // Get day with ordinal suffix (1st, 2nd, 3rd, etc.)
+    const day = date.getDate()
+    const ordinalSuffix = getOrdinalSuffix(day)
+    
+    // Get month name
+    const monthName = date.toLocaleDateString("en-US", { month: "long" })
+    
+    // Get year
+    const year = date.getFullYear()
+    
+    return `${monthName} ${day}${ordinalSuffix}, ${year}`
+  }
+
+  // Get ordinal suffix for day
+  const getOrdinalSuffix = (day: number): string => {
+    if (day > 3 && day < 21) return "th"
+    switch (day % 10) {
+      case 1: return "st"
+      case 2: return "nd"
+      case 3: return "rd"
+      default: return "th"
+    }
+  }
+
+  // Check if selected date is today
+  const isToday = selectedDate === new Date().toISOString().split("T")[0]
 
   useEffect(() => {
     setMounted(true)
@@ -55,14 +106,61 @@ export function TimelineHeader({ totalFlights, activeFlights, maintenanceZones, 
             </div>
           </div>
 
-          <div className="ml-8 flex items-center gap-6 border-l border-border pl-8">
-            <div className="flex items-center gap-2 text-sm">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground">{formattedDate}</span>
-            </div>
+          <div className="ml-8 flex items-center gap-2 border-l border-border pl-6">
+            {/* Date Navigation */}
+            {selectedDate && (
+              <div className="flex items-center">
+                <button
+                  onClick={onPreviousDay}
+                  className="p-1.5 hover:bg-muted rounded-md transition-colors cursor-pointer"
+                  title="Previous day"
+                >
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+                
+                {/* Clickable Date Display */}
+                <div 
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted rounded-md cursor-pointer transition-colors mx-1"
+                  onClick={handleDateClick}
+                  title="Click to pick a date"
+                >
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">
+                    {formatSelectedDate(selectedDate)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={onNextDay}
+                  className="p-1.5 hover:bg-muted rounded-md transition-colors cursor-pointer"
+                  title="Next day"
+                >
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+                
+                {!isToday && onToday && (
+                  <button
+                    onClick={onToday}
+                    className="ml-2 text-xs text-primary hover:underline"
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {/* Custom Calendar Picker */}
+            {showCalendar && selectedDate && (
+              <DatePickerCalendar
+                value={selectedDate}
+                onChange={handleDateChange}
+                onClose={() => setShowCalendar(false)}
+              />
+            )}
+
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="font-mono text-foreground">{formattedTime}</span>
+              <span className="font-mono text-foreground">{mounted ? formattedTime : "--:--"}</span>
             </div>
           </div>
         </div>

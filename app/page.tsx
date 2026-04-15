@@ -34,8 +34,35 @@ export default function StandAllocationBoard() {
   const [airlinesData, setAirlinesData] = useState<Airline[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Date state for filtering flights by day
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // Default to today's date in YYYY-MM-DD format
+    return new Date().toISOString().split("T")[0]
+  })
+
   // No maintenance zones in the DB — empty array
   const maintenanceZones: MaintenanceZone[] = []
+
+  // Handle date navigation
+  const handlePreviousDay = useCallback(() => {
+    setSelectedDate((prev) => {
+      const date = new Date(prev)
+      date.setDate(date.getDate() - 1)
+      return date.toISOString().split("T")[0]
+    })
+  }, [])
+
+  const handleNextDay = useCallback(() => {
+    setSelectedDate((prev) => {
+      const date = new Date(prev)
+      date.setDate(date.getDate() + 1)
+      return date.toISOString().split("T")[0]
+    })
+  }, [])
+
+  const handleToday = useCallback(() => {
+    setSelectedDate(new Date().toISOString().split("T")[0])
+  }, [])
 
   // Fetch data from Supabase
   const loadData = useCallback(async () => {
@@ -43,13 +70,13 @@ export default function StandAllocationBoard() {
     const [stands, airlines, flights] = await Promise.all([
       fetchStands(),
       fetchAirlines(),
-      fetchFlights(),
+      fetchFlights(undefined, selectedDate),
     ])
     setStandsData(stands)
     setAirlinesData(airlines)
     setFlightsData(flights)
     setLoading(false)
-  }, [])
+  }, [selectedDate])
 
   useEffect(() => {
     loadData()
@@ -197,6 +224,11 @@ export default function StandAllocationBoard() {
           activeFlights={activeFlights}
           maintenanceZones={maintenanceZones.length}
           onRefresh={handleRefresh}
+          selectedDate={selectedDate}
+          onPreviousDay={handlePreviousDay}
+          onNextDay={handleNextDay}
+          onToday={handleToday}
+          onDateChange={setSelectedDate}
         />
 
         <div className="flex items-center justify-between border-b border-border bg-card px-6 py-2">
