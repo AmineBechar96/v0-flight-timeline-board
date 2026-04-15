@@ -8,6 +8,9 @@ import { StandEditModal } from "./stand-edit-modal"
 import { cn } from "@/lib/utils"
 import { checkConflict, type ConflictResult } from "@/hooks/use-flight-drag"
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
+import { useStandData } from "@/hooks/use-stand-data"
+import { checkAircraftCompatibility, fetchStandCodeFilters } from "@/lib/data"
+import { toast } from "@/hooks/use-toast"
 
 interface TimelineGridProps {
   flights: Flight[]
@@ -39,6 +42,59 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
     const [editingStand, setEditingStand] = useState<Stand | null>(null)
     const [draggedStand, setDraggedStand] = useState<string | null>(null)
     const [standOrder, setStandOrder] = useState<Stand[]>([])
+    const [incompatibleStands, setIncompatibleStands] = useState<Set<string>>(new Set())
+    const [aircraftIncompatibilityError, setAircraftIncompatibilityError] = useState<string | null>(null)
+
+    const { codeAircraftTypes } = useStandData()
+
+    // Convert codeAircraftTypes array to a map for easier lookup
+    const codeAircraftTypesMap = useMemo(() => {
+      const map: Record<string, string[]> = {}
+      for (const cat of codeAircraftTypes) {
+        if (!map[cat.code_id]) {
+          map[cat.code_id] = []
+        }
+        map[cat.code_id].push(cat.aircraft_type)
+      }
+      return map
+    }, [codeAircraftTypes])
+
+    // Build a map of stand ID to stand for quick lookup
+    const standsMap = useMemo(() => {
+      const map = new Map<string, Stand>()
+      for (const stand of stands) {
+        map.set(stand.id, stand)
+      }
+      return map
+    }, [stands])
+
+    // Check aircraft compatibility for all stands when a flight is dragged
+    useEffect(() => {
+      if (!draggedFlight) {
+        setIncompatibleStands(new Set())
+        setAircraftIncompatibilityError(null)
+        return
+      }
+
+      const incompatible = new Set<string>()
+      for (const stand of stands) {
+        if (stand.id === draggedFlight.stand) continue // Skip current stand
+        if (stand.isClosed) continue
+
+        // Check if stand has explicit accepted codes
+        if (stand.acceptedAircraftCodes.length > 0) {
+          // Get aircraft code for this flight's type
+          const flightAircraftCode = Object.entries(codeAircraftTypesMap).find(([_, types]) => 
+            types.includes(draggedFlight.aircraftType)
+          )?.[0]
+
+          if (!flightAircraftCode || !stand.acceptedAircraftCodes.includes(flightAircraftCode)) {
+            incompatible.add(stand.id)
+          }
+        }
+      }
+      setIncompatibleStands(incompatible)
+    }, [draggedFlight, stands, codeAircraftTypesMap])
 
     const hourWidth = BASE_HOUR_WIDTH * zoom
 
@@ -229,6 +285,20 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
 
         try {
           const flightData = JSON.parse(e.dataTransfer.getData("application/json")) as Flight
+          
+          // Check if this stand is incompatible with the flight's aircraft type
+          if (incompatibleStands.has(stand)) {
+            toast({
+              title: "Aircraft type not accepted",
+              description: `This stand does not accept ${flightData.aircraftType} aircraft`,
+              variant: "destructive",
+            })
+            setDraggedFlight(null)
+            setTargetStand(null)
+            setConflictResult(null)
+            return
+          }
+
           const result = checkConflict(flightData, stand, flights)
 
           if (!result.hasConflict && stand !== flightData.stand) {
@@ -250,7 +320,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
         setTargetStand(null)
         setConflictResult(null)
       },
-      [flights, onFlightReassign]
+      [flights, onFlightReassign, incompatibleStands]
     )
 
     return (
@@ -373,6 +443,8 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                 const isAvailable = isTarget && !conflictResult?.hasConflict && draggedFlight?.stand !== stand
                 const feedbackForStand = showDropFeedback?.stand === stand
                 const isDragged = draggedStand === stand
+                const isIncompatible = draggedFlight && incompatibleStands.has(stand)
+                const isCurrentStand = draggedFlight?.stand === stand
 
                 return (
                   <div
@@ -384,13 +456,22 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
                       isTarget && "ring-2 ring-inset",
                       isAvailable && "bg-emerald-500/10 ring-emerald-500",
                       hasConflict && "bg-red-500/10 ring-red-500",
+                      isIncompatible && !isCurrentStand && "opacity-30 bg-muted/50",
                       feedbackForStand && showDropFeedback.success && "animate-pulse bg-emerald-500/30",
                       feedbackForStand && !showDropFeedback.success && "animate-pulse bg-red-500/30"
                     )}
                     style={{ height: `${ROW_HEIGHT}px` }}
-                    onDragOver={(e) => handleDragOver(e, stand)}
+                    onDragOver={(e) => {
+                      if (!isIncompatible || isCurrentStand) {
+                        handleDragOver(e, stand)
+                      }
+                    }}
                     onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, stand)}
+                    onDrop={(e) => {
+                      if (!isIncompatible || isCurrentStand) {
+                        handleDrop(e, stand)
+                      }
+                    }}
                   >
                     {/* Drop zone indicator */}
                     {isTarget && (
@@ -443,6 +524,7 @@ export const TimelineGrid = forwardRef<TimelineGridHandle, TimelineGridProps>(
           currentCodeId={editingStand?.code || ""}
           currentAirplanes=""
           currentActive={editingStand ? !editingStand.isClosed : true}
+          currentAcceptedCodes={editingStand?.acceptedAircraftCodes || []}
           onSave={(data) => {
             console.log("Save stand:", editingStand?.id, data)
             setEditingStand(null)

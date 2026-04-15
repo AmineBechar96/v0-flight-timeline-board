@@ -8,6 +8,7 @@ import {
   MapPin,
   Gauge,
   Layers,
+  Plane,
 } from "lucide-react"
 import {
   Dialog,
@@ -19,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { useStandData } from "@/hooks/use-stand-data"
 import { FlightFiltersSection } from "@/components/flight-filters-section"
+import { cn } from "@/lib/utils"
+import { saveStandAircraftCodes } from "@/lib/data"
 
 interface StandEditModalProps {
   isOpen: boolean
@@ -28,8 +31,11 @@ interface StandEditModalProps {
   currentCodeId?: string
   currentAirplanes?: string
   currentActive?: boolean
-  onSave: (data: { zoneId: string; codeId: string; airplanes: string; active: boolean }) => void
+  currentAcceptedCodes?: string[]
+  onSave: (data: { zoneId: string; codeId: string; airplanes: string; active: boolean; acceptedCodes: string[] }) => void
 }
+
+const AIRCRAFT_CODES = ["A", "B", "C", "D", "E", "F"]
 
 export function StandEditModal({
   isOpen,
@@ -39,13 +45,15 @@ export function StandEditModal({
   currentCodeId = "",
   currentAirplanes = "",
   currentActive = true,
+  currentAcceptedCodes = [],
   onSave,
 }: StandEditModalProps) {
-  const { codes, isLoading: isLoadingContext } = useStandData()
+  const { codes, isLoading: isLoadingContext, codeAircraftTypes } = useStandData()
   
   const [zoneId, setZoneId] = useState(currentZoneId)
   const [codeId, setCodeId] = useState(currentCodeId)
   const [active, setActive] = useState(currentActive)
+  const [acceptedCodes, setAcceptedCodes] = useState<string[]>(currentAcceptedCodes)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState<{ code?: string }>({})
 
@@ -55,9 +63,34 @@ export function StandEditModal({
       setZoneId(currentZoneId)
       setCodeId(currentCodeId)
       setActive(currentActive)
+      setAcceptedCodes(currentAcceptedCodes)
       setFormErrors({})
     }
-  }, [isOpen, currentZoneId, currentCodeId, currentActive])
+  }, [isOpen, currentZoneId, currentCodeId, currentActive, currentAcceptedCodes])
+
+  // Get aircraft types for each code
+  const getAircraftTypesForCode = (code: string): string[] => {
+    return codeAircraftTypes
+      .filter((cat) => cat.code_id === code)
+      .map((cat) => cat.aircraft_type)
+  }
+
+  const toggleCode = (code: string) => {
+    setAcceptedCodes((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((c) => c !== code)
+      }
+      return [...prev, code]
+    })
+  }
+
+  const selectAllCodes = () => {
+    setAcceptedCodes([...AIRCRAFT_CODES])
+  }
+
+  const clearAllCodes = () => {
+    setAcceptedCodes([])
+  }
 
   const validateForm = () => {
     const errors: { code?: string } = {}
@@ -80,11 +113,17 @@ export function StandEditModal({
     // Simulate save delay for animation
     await new Promise(resolve => setTimeout(resolve, 300))
     
+    // Save accepted aircraft codes to database
+    if (standId) {
+      await saveStandAircraftCodes(standId, acceptedCodes)
+    }
+    
     onSave({
       zoneId: zoneId.trim(),
       codeId: codeId.trim(),
       airplanes: currentAirplanes || "",
       active,
+      acceptedCodes,
     })
     
     setIsSubmitting(false)
@@ -95,6 +134,7 @@ export function StandEditModal({
     setZoneId(currentZoneId)
     setCodeId(currentCodeId)
     setActive(currentActive)
+    setAcceptedCodes(currentAcceptedCodes)
     setFormErrors({})
     onClose()
   }
@@ -200,6 +240,94 @@ export function StandEditModal({
                   {formErrors.code}
                 </p>
               )}
+            </div>
+
+            {/* Accepted Aircraft Codes Multi-Select */}
+            <div className="group relative">
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground/80 mb-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-primary/10">
+                  <Plane className="h-3 w-3 text-primary" />
+                </span>
+                Accepted Aircraft Codes
+              </label>
+              
+              <div className="space-y-3">
+                {/* Code selection buttons */}
+                <div className="grid grid-cols-6 gap-2">
+                  {AIRCRAFT_CODES.map((code) => {
+                    const aircraftTypes = getAircraftTypesForCode(code)
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => toggleCode(code)}
+                        disabled={isSubmitting}
+                        className={cn(
+                          "relative h-12 rounded-lg border text-sm font-bold transition-all duration-200 hover:cursor-pointer",
+                          acceptedCodes.includes(code)
+                            ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md"
+                            : "bg-card border-input hover:border-emerald-500/50 hover:bg-emerald-500/5 text-muted-foreground"
+                        )}
+                        title={aircraftTypes.length > 0 ? aircraftTypes.join(", ") : "No aircraft types mapped"}
+                      >
+                        <span className="relative z-10">{code}</span>
+                        {acceptedCodes.includes(code) && (
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                
+                {/* Quick actions */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllCodes}
+                    disabled={isSubmitting}
+                    className="flex-1 h-8 rounded border border-input bg-card text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAllCodes}
+                    disabled={isSubmitting}
+                    className="flex-1 h-8 rounded border border-input bg-card text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                
+                {/* Selected codes summary */}
+                {acceptedCodes.length > 0 && (
+                  <div className="rounded border bg-muted/30 p-2">
+                    <p className="text-xs text-muted-foreground mb-1.5">Selected codes accept:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {acceptedCodes.map((code) => {
+                        const types = getAircraftTypesForCode(code)
+                        return (
+                          <span
+                            key={code}
+                            className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-medium text-emerald-400"
+                          >
+                            <span className="font-bold">{code}:</span>
+                            <span className="text-emerald-300">
+                              {types.length > 0 ? types.slice(0, 3).join(", ") + (types.length > 3 ? "..." : "") : "none"}
+                            </span>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {acceptedCodes.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No codes selected. Leave empty to use all codes from stand's base code.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Flight Filters Section */}

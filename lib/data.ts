@@ -1,26 +1,56 @@
 import { supabase } from "./supabase"
 import type { Flight, FlightType, Stand, Airline, ConnectionType, StandCodeFilter } from "./types"
+import { ADJACENT_PBB_PAIRS } from "./types"
 
 /**
  * Fetch all stands from Supabase, ordered by id.
  */
 export async function fetchStands(): Promise<Stand[]> {
-  const { data, error } = await supabase
-    .from("stands")
-    .select("id, zone, code, is_closed")
-    .order("id")
+  try {
+    // First try to fetch with accepted_aircraft_codes
+    const { data: dataWithCodes, error: error1 } = await supabase
+      .from("stands")
+      .select("id, zone, code, is_closed, accepted_aircraft_codes")
+      .order("id")
 
-  if (error) {
-    console.error("Error fetching stands:", error)
+    // If no error and we have data, use it
+    if (!error1 && dataWithCodes && dataWithCodes.length > 0) {
+      return dataWithCodes.map((s) => ({
+        id: s.id,
+        zone: s.zone ?? null,
+        code: s.code ?? null,
+        isClosed: s.is_closed ?? false,
+        acceptedAircraftCodes: s.accepted_aircraft_codes ?? [],
+      }))
+    }
+
+    // If error, try without accepted_aircraft_codes (old schema)
+    if (error1) {
+      console.log("Trying fallback schema without accepted_aircraft_codes...")
+    }
+    
+    // Try fallback query (either because of error or empty data)
+    const result = await supabase
+      .from("stands")
+      .select("id, zone, code, is_closed")
+      .order("id")
+    
+    if (result.error) {
+      console.error("Error fetching stands:", result.error)
+      return []
+    }
+    
+    return (result.data ?? []).map((s) => ({
+      id: s.id,
+      zone: s.zone ?? null,
+      code: s.code ?? null,
+      isClosed: s.is_closed ?? false,
+      acceptedAircraftCodes: [],
+    }))
+  } catch (err) {
+    console.error("Exception fetching stands:", err)
     return []
   }
-
-  return (data ?? []).map((s) => ({
-    id: s.id,
-    zone: s.zone,
-    code: s.code,
-    isClosed: s.is_closed ?? false,
-  }))
 }
 
 /**
@@ -353,4 +383,359 @@ export function filterEligibleFlights<F extends { aircraftType: string }>(
     if (addedTypes.has(aircraftType)) return true
     return codeTypes.has(aircraftType)
   })
+}
+
+/**
+ * Temporal overlap result interface
+ */
+export interface TemporalOverlapResult {
+  hasOverlap: boolean
+  overlappingFlights: Array<{
+    flight: Flight
+    gapMinutes: number
+    isTooClose: boolean
+  }>
+  message: string | null
+}
+
+export interface AdjacentPbbConflictResult {
+  hasConflict: boolean
+  conflicts: Array<{
+    flight: Flight
+    gapMinutes: number
+    type: string
+  }>
+  message: string | null
+}
+
+/**
+ * Get the movement times (in hours from midnight) for a flight.
+ * Arrivals have one movement at start time.
+ * Departures have one movement at end time.
+ * Turnarounds have movements at both start and end times.
+ */
+export function getFlightMovements(flight: Flight): number[] {
+  const start = flight.startTime
+  const end = flight.startTime + flight.duration
+  if (flight.type === "arrival") return [start]
+  if (flight.type === "departure") return [end]
+  if (flight.type === "turnaround") return [start, end]
+  return [start, end] // Fallback
+}
+
+/**
+ * Check for adjacent PBB movement gap conflicts.
+ */
+export function checkAdjacentPbbOverlap(
+  newFlight: Flight,
+  standId: string,
+  existingFlights: Flight[],
+  gapMinutes: number = 5
+): AdjacentPbbConflictResult {
+  // Find adjacent stands
+  const adjacentStands = new Set<string>()
+  for (const pair of ADJACENT_PBB_PAIRS) {
+    if (pair[0] === standId) adjacentStands.add(pair[1])
+    if (pair[1] === standId) adjacentStands.add(pair[0])
+  }
+  
+  if (adjacentStands.size === 0) {
+    return { hasConflict: false, conflicts: [], message: null }
+  }
+
+  const conflicts: AdjacentPbbConflictResult['conflicts'] = []
+  const newMovements = getFlightMovements(newFlight)
+  const gapHours = gapMinutes / 60
+  
+  for (const flight of existingFlights) {
+    if (flight.id === newFlight.id) continue
+    if (!adjacentStands.has(flight.stand)) continue
+    
+    const existingMovements = getFlightMovements(flight)
+    
+    let minGapHours = Infinity
+    for (const t1 of newMovements) {
+      for (const t2 of existingMovements) {
+        const gap = Math.abs(t1 - t2)
+        if (gap < gapHours && gap < minGapHours) {
+          minGapHours = gap
+        }
+      }
+    }
+    
+    if (minGapHours < gapHours) {
+      conflicts.push({
+        flight,
+        gapMinutes: Math.round(minGapHours * 60),
+        type: flight.type
+      })
+    }
+  }
+
+  const hasConflict = conflicts.length > 0
+  let message: string | null = null
+  
+  if (hasConflict && conflicts.length === 1) {
+    const c = conflicts[0]
+    message = `Adjacent PBB conflict: movement on stand ${standId} is within ${gapMinutes} min of movement on stand ${c.flight.stand} (gap: ${c.gapMinutes} min)`
+  } else if (hasConflict) {
+    message = `Adjacent PBB conflict: ${conflicts.length} movements are within ${gapMinutes} min of movements on stand ${standId}`
+  }
+
+  return { hasConflict, conflicts, message }
+}
+
+/**
+ * Check for temporal overlap between flights on a stand.
+ * Two flights must have at least minTurnaroundMinutes gap between them.
+ * 
+ * @param newFlight - The flight being assigned
+ * @param standId - The target stand
+ * @param existingFlights - All flights on that stand
+ * @param minTurnaroundMinutes - Minimum gap required (default: 15)
+ */
+export function checkTemporalOverlap(
+  newFlight: Flight,
+  standId: string,
+  existingFlights: Flight[],
+  minTurnaroundMinutes: number = 15
+): TemporalOverlapResult {
+  const newStart = newFlight.startTime
+  const newEnd = newFlight.startTime + newFlight.duration
+  
+  // Filter flights on the same stand (excluding the flight being moved)
+  const standFlights = existingFlights.filter(
+    f => f.stand === standId && f.id !== newFlight.id
+  )
+
+  const overlappingFlights: TemporalOverlapResult['overlappingFlights'] = []
+  
+  for (const flight of standFlights) {
+    const flightStart = flight.startTime
+    const flightEnd = flight.startTime + flight.duration
+    
+    // Calculate gap between flights
+    // If new flight is after existing flight
+    const gapMinutes = flightEnd < newStart 
+      ? (newStart - flightEnd) * 60  // Gap after existing flight
+      : flightStart > newEnd
+        ? (flightStart - newEnd) * 60  // Gap before existing flight
+        : 0  // Overlap
+
+    const isTooClose = gapMinutes < minTurnaroundMinutes && gapMinutes >= 0
+    
+    if (isTooClose || (flightStart < newEnd && flightEnd > newStart)) {
+      overlappingFlights.push({
+        flight,
+        gapMinutes: Math.round(gapMinutes),
+        isTooClose,
+      })
+    }
+  }
+
+  const hasOverlap = overlappingFlights.length > 0
+  
+  let message: string | null = null
+  if (hasOverlap && overlappingFlights.length === 1) {
+    const conflict = overlappingFlights[0]
+    message = `Overlap conflict on stand ${standId}: flight ${newFlight.flightNumber} and flight ${conflict.flight.flightNumber} have only ${conflict.gapMinutes} min gap (minimum ${minTurnaroundMinutes})`
+  } else if (hasOverlap) {
+    message = `Overlap conflict on stand ${standId}: ${overlappingFlights.length} flights have insufficient gap (minimum ${minTurnaroundMinutes} min)`
+  }
+
+  return {
+    hasOverlap,
+    overlappingFlights,
+    message,
+  }
+}
+
+/**
+ * Fetch constraint configuration from database
+ */
+export async function fetchConstraintConfig(key: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("constraints_config")
+    .select("value")
+    .eq("key", key)
+    .single()
+
+  if (error) {
+    console.log(`No constraint found for key: ${key}`)
+    return null
+  }
+
+  return data?.value ?? null
+}
+
+/**
+ * Fetch all constraint configurations
+ */
+export async function fetchAllConstraints(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from("constraints_config")
+    .select("key, value")
+
+  if (error) {
+    console.error("Error fetching constraints:", error)
+    return {}
+  }
+
+  const result: Record<string, number> = {}
+  for (const row of data ?? []) {
+    result[row.key] = row.value
+  }
+  return result
+}
+
+/**
+ * Save constraint configuration to database
+ */
+export async function saveConstraint(key: string, value: number): Promise<boolean> {
+  const { error } = await supabase
+    .from("constraints_config")
+    .upsert({ key, value }, { onConflict: 'key' })
+
+  if (error) {
+    console.error("Error saving constraint:", error)
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Get minimum turnaround minutes from config or default
+ */
+export async function getMinTurnaroundMinutes(): Promise<number> {
+  const value = await fetchConstraintConfig('min_stand_turnaround_minutes')
+  return value ?? 15
+}
+
+/**
+ * Get adjacent PBB movement gap minutes from config or default
+ */
+export async function getAdjacentPbbGapMinutes(): Promise<number> {
+  const value = await fetchConstraintConfig('adjacent_pbb_movement_gap_minutes')
+  return value ?? 5
+}
+
+/**
+ * Get the aircraft code (A-F) for a given aircraft type based on code_aircraft_types mapping.
+ */
+export function getAircraftCodeForType(
+  aircraftType: string,
+  codeAircraftTypes: Record<string, string[]>
+): string | null {
+  for (const [code, aircraftTypes] of Object.entries(codeAircraftTypes)) {
+    if (aircraftTypes.includes(aircraftType)) {
+      return code
+    }
+  }
+  return null
+}
+
+/**
+ * Check if a flight's aircraft type is compatible with a stand based on accepted codes.
+ * Returns an error message if incompatible, null if compatible.
+ */
+export function checkAircraftCompatibility(
+  aircraftType: string,
+  stand: Stand,
+  codeAircraftTypes: Record<string, string[]>,
+  standCodeFilters: StandCodeFilter[] = []
+): string | null {
+  // Get the aircraft code for this type
+  const aircraftCode = getAircraftCodeForType(aircraftType, codeAircraftTypes)
+  
+  // If we can't determine the aircraft code, allow it (backward compatibility)
+  if (!aircraftCode) {
+    return null
+  }
+
+  // Check if stand has explicit accepted codes
+  if (stand.acceptedAircraftCodes.length > 0) {
+    if (!stand.acceptedAircraftCodes.includes(aircraftCode)) {
+      return `Aircraft type ${aircraftType} not compatible with stand ${stand.id}`
+    }
+  }
+
+  // Check stand code filters (add/remove operations)
+  const addFilters = standCodeFilters.filter((f) => f.operation === "add")
+  const removeFilters = standCodeFilters.filter((f) => f.operation === "remove")
+  
+  // If there are add filters, only these types are allowed
+  if (addFilters.length > 0) {
+    const addedTypes = new Set(addFilters.map((f) => f.aircraft_type))
+    if (!addedTypes.has(aircraftType)) {
+      return `Aircraft type ${aircraftType} not compatible with stand ${stand.id}`
+    }
+  }
+
+  // Check remove filters - if type is removed, it's not allowed
+  const removedTypes = new Set(removeFilters.map((f) => f.aircraft_type))
+  if (removedTypes.has(aircraftType)) {
+    return `Aircraft type ${aircraftType} not compatible with stand ${stand.id}`
+  }
+
+  // Check if the code is in the default allowed types for the stand's code
+  if (stand.code) {
+    const defaultTypes = codeAircraftTypes[stand.code] || []
+    if (!defaultTypes.includes(aircraftType) && addFilters.length === 0) {
+      return `Aircraft type ${aircraftType} not compatible with stand ${stand.id}`
+    }
+  }
+
+  return null
+}
+
+/**
+ * Get stands that are compatible with a given flight (excludes incompatible stands from candidates).
+ */
+export function getCompatibleStands(
+  flight: Flight,
+  stands: Stand[],
+  codeAircraftTypes: Record<string, string[]>,
+  standFiltersMap: Map<string, StandCodeFilter[]> = new Map()
+): Stand[] {
+  return stands.filter((stand) => {
+    // Skip closed stands
+    if (stand.isClosed) return false
+    
+    // Check aircraft compatibility
+    const compatibilityError = checkAircraftCompatibility(
+      flight.aircraftType,
+      stand,
+      codeAircraftTypes,
+      standFiltersMap.get(stand.id) || []
+    )
+    
+    return compatibilityError === null
+  })
+}
+
+/**
+ * Save accepted aircraft codes for a stand.
+ */
+export async function saveStandAircraftCodes(
+  standId: string,
+  codes: string[]
+): Promise<boolean> {
+  // Try to update with accepted_aircraft_codes
+  const { error } = await supabase
+    .from("stands")
+    .update({ accepted_aircraft_codes: codes })
+    .eq("id", standId)
+
+  if (error) {
+    // If the column doesn't exist, just log and return success (backward compatibility)
+    if (error.message && (error.message.includes('column') || error.message.includes('undefined'))) {
+      console.log("accepted_aircraft_codes column not available, skipping save")
+      return true
+    }
+    console.error("Error saving stand aircraft codes:", error)
+    return false
+  }
+
+  return true
 }

@@ -14,6 +14,7 @@ export interface Flight {
   stand: string
   startTime: number // hours from midnight (0-24)
   duration: number // in hours
+  endTime?: number // computed: startTime + duration
   type: FlightType
   status: FlightStatus
   connectionType: ConnectionType | null
@@ -22,11 +23,49 @@ export interface Flight {
   delayMinutes?: number
 }
 
+// Constraint configuration interface
+export interface ConstraintConfig {
+  key: string
+  value: number
+  description?: string
+}
+
+// Default constraint values
+export const DEFAULT_CONSTRAINTS: Record<string, number> = {
+  min_stand_turnaround_minutes: 15,
+  conflict_buffer_minutes: 15,
+  adjacent_pbb_movement_gap_minutes: 5,
+}
+
+export const ADJACENT_PBB_PAIRS = [
+  ["3", "4"],
+  ["4", "5"],
+  ["5", "6"],
+  ["6", "7"],
+  ["7", "8"],
+]
+
 export interface Stand {
   id: string
   zone: string | null
   code: string | null
   isClosed: boolean
+  // Accepted aircraft codes for this stand (e.g., ["C", "D", "E"])
+  acceptedAircraftCodes: string[]
+}
+
+export type StandFilterType = "airline" | "flight_type" | "domestic" | "international"
+
+export interface StandFilter {
+  id?: number
+  stand_id: string
+  filter_type: StandFilterType
+  value: string // e.g., airline code, flight type, etc.
+  operation: "allow" | "deny"
+}
+
+export interface StandWithFilters extends Stand {
+  filters: StandFilter[]
 }
 
 export interface Airline {

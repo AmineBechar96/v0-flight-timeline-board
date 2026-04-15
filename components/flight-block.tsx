@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Users, Clock, AlertTriangle, GripVertical } from "lucide-react"
+import { PlaneLanding, PlaneTakeoff, ArrowLeftRight, Users, Clock, AlertTriangle, GripVertical, AlertOctagon } from "lucide-react"
 import type { Flight } from "@/lib/types"
 import { airlineColors, typeColors, statusColors } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -13,9 +13,15 @@ interface FlightBlockProps {
   onSelect?: (flight: Flight) => void
   isDragging?: boolean
   isConflicting?: boolean
+  hasTemporalConflict?: boolean
+  temporalConflictGap?: number
+  minTurnaroundMinutes?: number
   onDragStart?: (flight: Flight) => void
   onDragEnd?: () => void
 }
+
+// Default value for min turnaround
+const DEFAULT_MIN_TURNAROUND = 15
 
 export function FlightBlock({
   flight,
@@ -23,6 +29,9 @@ export function FlightBlock({
   onSelect,
   isDragging,
   isConflicting,
+  hasTemporalConflict,
+  temporalConflictGap,
+  minTurnaroundMinutes = DEFAULT_MIN_TURNAROUND,
   onDragStart,
   onDragEnd,
 }: FlightBlockProps) {
@@ -250,6 +259,16 @@ export function FlightBlock({
         </div>
       )}
 
+      {/* Temporal conflict warning in tooltip */}
+      {hasTemporalConflict && temporalConflictGap !== undefined && (
+        <div className="mt-2 flex items-center gap-2 rounded bg-orange-600/20 px-2 py-1.5 text-xs border border-orange-600/30">
+          <AlertOctagon className="h-3.5 w-3.5 text-orange-500" />
+          <span className="font-bold text-orange-500">
+            Only {temporalConflictGap} min gap — minimum {minTurnaroundMinutes} min required
+          </span>
+        </div>
+      )}
+
       {/* Only show drag hint when NOT dragging */}
       {!isDragging && (
         <div className="mt-2 pt-2 border-t border-border">
@@ -274,7 +293,8 @@ export function FlightBlock({
         className={cn(
           "group absolute top-1 bottom-1 hover:cursor-pointer active:cursor-grabbing",
           isDragging && "opacity-50 scale-95",
-          isConflicting && "ring-2 ring-red-500 ring-offset-1 ring-offset-background animate-pulse"
+          isConflicting && "ring-2 ring-red-500 ring-offset-1 ring-offset-background animate-pulse",
+          hasTemporalConflict && "ring-2 ring-orange-500 ring-offset-1 ring-offset-background"
         )}
         style={{ left: `${left}px`, width: `${width}px` }}
         onMouseEnter={handleMouseEnter}
@@ -291,7 +311,8 @@ export function FlightBlock({
             typeColor,
             statusStyle,
             "hover:scale-[1.02] hover:shadow-lg",
-            isConflicting && "bg-red-600 border-red-400"
+            isConflicting && "bg-red-600 border-red-400",
+            hasTemporalConflict && "bg-orange-500 border-orange-400"
           )}
         >
           <div className="flex items-center gap-1 flex-1">
@@ -299,10 +320,20 @@ export function FlightBlock({
             <TypeIcon className="h-3 w-3 shrink-0" />
             <span className="truncate font-semibold">{flight.flightNumber}</span>
             {flight.status === "delayed" && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />}
+            {hasTemporalConflict && <AlertOctagon className="h-3 w-3 shrink-0 text-orange-200 animate-pulse" />}
           </div>
 
+          {/* Temporal conflict warning badge on right edge */}
+          {hasTemporalConflict && temporalConflictGap !== undefined && (
+            <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-orange-600 min-w-[40px] px-1 rounded-r border-l-2 border-orange-800 shadow-lg" title={`Only ${temporalConflictGap} min gap — minimum ${minTurnaroundMinutes} min required`}>
+              <span className="text-white text-[10px] font-bold">
+                {temporalConflictGap}m
+              </span>
+            </div>
+          )}
+
           {/* Delay badge on right edge - full height strong red */}
-          {flight.delayMinutes && (
+          {flight.delayMinutes && !hasTemporalConflict && (
             <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-600 min-w-[32px] px-1 rounded-r border-l-2 border-red-800 shadow-lg">
               <span className="text-white text-[11px] font-bold">
                 {flight.delayMinutes}
