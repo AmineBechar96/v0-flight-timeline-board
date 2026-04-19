@@ -8,6 +8,7 @@ import { ZoomControls } from "@/components/zoom-controls"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { FlightDetailPanel } from "@/components/flight-detail-panel"
 import { CodesManagementModal } from "@/components/codes-management-modal"
+import { KpiCounter } from "@/components/kpi-counter"
 import { StandDataProvider } from "@/hooks/use-stand-data"
 import type { Flight, Airline, Stand } from "@/lib/types"
 import type { MaintenanceZone } from "@/lib/types"
@@ -325,6 +326,7 @@ export default function StandAllocationBoard() {
 
         <FlightDetailPanel flight={selectedFlight} onClose={handleClosePanel} />
         <CodesManagementModal isOpen={showCodesModal} onClose={() => setShowCodesModal(false)} />
+        <KpiCounter flights={flights} allocationMode={allocationMode} />
       </div>
     </StandDataProvider>
   )

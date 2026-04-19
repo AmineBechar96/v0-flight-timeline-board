@@ -135,9 +135,12 @@ export function csvRowToFlight(row: CsvAllocationRow): Flight {
   const paxOut = parseInt(row.PAXOUT) || 0
   const stand = row.MODEL_STAND || row.HIST_STAND || ""
   
+  // Create flight number with airline code prefix (e.g., "ABY25064353" instead of "25064353")
+  const flightNumber = `${airlineCode}${row.MVMTNO}`
+  
   return {
-    id: row.MVMTNO,
-    flightNumber: row.MVMTNO,
+    id: `${airlineCode}_${row.MVMTNO}`,
+    flightNumber: flightNumber,
     airline: airlineName,
     airlineCode,
     origin: isArrival ? row.DESTN : undefined,
@@ -312,9 +315,12 @@ export function optimizedCsvRowToFlight(row: OptimizedCsvRow, dateStr: string): 
   const paxIn = parseInt(row.PAXIN) || 0
   const trfrPax = parseInt(row.TRFRPAX) || 0
   
+  // Create flight number with airline code prefix (e.g., "ABY25064353" instead of "25064353")
+  const flightNumber = `${airlineCode}${row.MVMTNO}`
+  
   return {
-    id: row.MVMTNO,
-    flightNumber: row.MVMTNO,
+    id: `${airlineCode}_${row.MVMTNO}`,
+    flightNumber: flightNumber,
     airline: airlineName,
     airlineCode,
     origin: row.DESTN, // For arrivals, destination is origin
